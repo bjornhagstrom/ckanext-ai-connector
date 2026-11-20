@@ -59,6 +59,12 @@ def _purpose_key(model, chosen):
     return keys.PROVIDER_KEYS.get(routed_service(model), "")
 
 
+def _key_service(name):
+    """The known service a key variable belongs to, or "" (a key under a name of its own, or another name the server
+    allows)."""
+    return next((service for service, env in keys.PROVIDER_KEYS.items() if env == name), "")
+
+
 def _context():
     user = toolkit.current_user
     return {"user": user.name if user.is_authenticated else ""}
@@ -214,6 +220,8 @@ def settings_page():
     rows = settings.overview()
     suggestions = keys.model_suggestions()
     key_rows = keys.key_status()
+    for row in key_rows:
+        row["service"] = _key_service(row["name"])   # for the purposes' rows: the key follows the model's service
     if not form.get("api_key_env"):
         # No key variable chosen anywhere (none saved here, none on the server) but a key is there: the page names it and
         # suggests a model of its service. With a model already chosen, only the key of that model's service: never one

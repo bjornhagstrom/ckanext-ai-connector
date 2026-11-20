@@ -5,6 +5,16 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-20
+
+### Changed
+
+- **A purpose's key follows its model on the AI settings page:** choosing a model of a known service (`anthropic/…`,
+  `gemini/…`) selects that service's key when it is the only key set that fits, also when the page opens; with several
+  (another name the server allows) the sysadmin chooses, and a fitting key chosen by hand stays. A key of another service
+  is let go. A key added under a name of its own is never chosen by the script, since the page does not know which
+  service it is for. Nothing changes with an AI server of one's own. The page's script has tests of its own (Node.js).
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

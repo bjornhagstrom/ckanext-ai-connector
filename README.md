@@ -14,7 +14,7 @@ answers and what is done with them belong to the extension that asks.
 
 ![The AI settings page: the setup checks are in order, and a test of the connection has just answered with the chosen model](docs/images/settings-page.jpg)
 
-Status: 0.2.0; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
+Status: 0.2.1; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
 
 ## Requirements
 
@@ -316,6 +316,12 @@ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit -
 docker compose -f docker-compose.test.yml down -v
 CKAN_VERSION=2.11.1 SOLR_VERSION=2.11 docker compose -p ai-connector-2111 -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
 CKAN_VERSION=2.11.1 SOLR_VERSION=2.11 docker compose -p ai-connector-2111 -f docker-compose.test.yml down -v
+```
+
+The settings page's script has tests of its own, run with Node.js 22 or later:
+
+```console
+node --test ckanext/ai_connector/tests/js/test_settings.js
 ```
 
 Never run the tests against a CKAN database you care about: CKAN's test fixtures empty it.

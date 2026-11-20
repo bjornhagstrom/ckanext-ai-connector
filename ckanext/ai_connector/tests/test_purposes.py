@@ -289,3 +289,22 @@ def test_with_an_own_ai_server_the_main_key_is_taken_also_for_a_known_services_m
           purpose_key__my_extension__translate="")
     settings.forget_rows()
     assert purposes.choice("my_extension", "translate")["api_key_env"] == "GEMINI_API_KEY"   # the server's, not Anthropic's
+
+
+def test_a_rows_key_options_say_which_service_they_belong_to(app):
+    """The page's script lets a row's key follow its model: it needs to know each key's service, and the custom keys."""
+    keys.add_custom_key("ACME_API_KEY", "a-key-for-acme-that-is-long-enough-0042", user="boss")
+    page = app.get("/ckan-admin/ai", headers=_headers()).body
+    row = page[page.index('name="purpose_key.my_extension.translate"'):]
+    row = row[:row.index("</select>")]
+    assert 'value="ANTHROPIC_API_KEY" data-service="anthropic"' in row
+    assert 'value="ACME_API_KEY" data-service="" data-custom="yes"' in row
+    assert 'id="purposes-form"' in page and 'data-purpose-key="purpose_key.my_extension.translate"' in page
+
+
+@pytest.mark.ckan_config(P + "api_base", "https://ai.example.org/v1")
+def test_with_an_own_ai_server_the_page_tells_the_script_to_leave_the_keys_alone(app):
+    """Every key goes to the AI server of one's own, so the script must not pick a known service's key for a row."""
+    page = app.get("/ckan-admin/ai", headers=_headers()).body
+    form = page[page.index('id="purposes-form"'):]
+    assert 'data-api-base="yes"' in form[:form.index(">")]

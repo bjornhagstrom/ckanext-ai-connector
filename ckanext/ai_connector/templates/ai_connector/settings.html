@@ -263,7 +263,8 @@
       <datalist id="ai-purpose-models">
         {% for s in suggestions %}<option value="{{ s.model }}"></option>{% endfor %}
       </datalist>
-      <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
+      <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}" id="purposes-form"
+            data-api-base="{{ 'yes' if api_base else '' }}" data-provider-keys="{{ h.dump_json(provider_keys) }}">
         {{ h.csrf_input() }}
         {#- The form's default button (Enter in a field) is its first submit button: Save, not the first row's Test. -#}
         <button type="submit" tabindex="-1" aria-hidden="true" style="position: absolute; left: -9999px;">{{ _('Save the models for the purposes') }}</button>
@@ -281,7 +282,7 @@
                 </div>
                 <div class="col-md-6">
                   <input class="form-control" id="{{ model_field }}" name="{{ model_field }}" value="{{ shown_model }}"
-                         list="ai-purpose-models" autocomplete="off"
+                         list="ai-purpose-models" autocomplete="off" data-purpose-key="{{ key_field }}"
                          placeholder="{{ _('The main model') }}">
                   {% if row.broken %}<small class="text-danger d-block">{{ _('The saved choice cannot be read. Choose the model again.') }}</small>{% endif %}
                 </div>
@@ -289,7 +290,8 @@
                   <select class="form-control form-select" name="{{ key_field }}" aria-label="{{ _('API key for {purpose}').format(purpose=row.label) }}">
                     <option value="" {% if not shown_key %}selected{% endif %}>{{ _('The key of the model\'s service') }}</option>
                     {% for k in keys if k.set or k.name == shown_key %}
-                      <option value="{{ k.name }}" {% if k.name == shown_key %}selected{% endif %}>{{ key_text(k) }}</option>
+                      <option value="{{ k.name }}" data-service="{{ k.service }}" data-custom="{{ 'yes' if k.custom else '' }}"
+                              data-set="{{ 'yes' if k.set else '' }}" {% if k.name == shown_key %}selected{% endif %}>{{ key_text(k) }}</option>
                     {% endfor %}
                   </select>
                 </div>
