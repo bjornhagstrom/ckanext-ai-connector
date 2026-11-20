@@ -12,6 +12,8 @@ and code for each AI service.
 ckanext-ai-connector does nothing with the AI by itself. It has no opinion about what is asked: prompts, the shape of the
 answers and what is done with them belong to the extension that asks.
 
+![The AI settings page: the setup checks are in order, and a test of the connection has just answered with the chosen model](docs/images/settings-page.jpg)
+
 Status: 0.1.0, the first release; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
 
 ## Requirements
@@ -42,12 +44,16 @@ Status: 0.1.0, the first release; the API may still change before 1.0 (see [Vers
 A portal can use either layer alone: only the server's configuration (the page then shows it and can test it), or only
 the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts the keys).
 
+![Use the server's values: before anything changes, the page shows which values go and what replaces them](docs/images/use-server-values.jpg)
+
 ### Choosing a model
 
 - **The models follow the key.** Choose an API key and the model list shows that service's models, with a recommended one
   chosen. Any other model can be written as LiteLLM writes it, `service/model`.
 - **Test the connection** tries the values in the form, with one short question to the service, without saving anything.
   When it fails, it says what the service's answer means (wrong key, unknown model, busy, quota used up).
+
+![With an Anthropic key chosen, the model list shows Anthropic's models only, and a line says what to do next](docs/images/models-follow-key.jpg)
 
 ### API keys
 
@@ -63,6 +69,8 @@ the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts t
   `_API_KEY`; such a key is never looked up among the server's variables, and names that could point at something else
   (`SECRET`, `PASSWORD`, `TOKEN`, `POSTGRES`, `CKAN` ...) are refused. A key that looks like another service's key is caught
   before it is stored. No key is ever written to a log.
+
+![Manage API keys: the keys there are, with their last four characters only, and a form to add one for a service chosen in a list](docs/images/api-keys.jpg)
 
 ### Setup checks
 
