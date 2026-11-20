@@ -9,7 +9,7 @@ Every extension that uses AI goes through this connection, so the AI settings ar
 that wants to ask an AI something asks ckanext-ai-connector for a client, instead of having its own settings page, keys
 and code for each AI service.
 
-ckanext-ai-connector does nothing with the AI by itself. It has no opinion about what is asked: prompts, the shape of the
+Editors see nothing of ckanext-ai-connector itself: what they see is the extension that uses the AI. ckanext-ai-connector does nothing with the AI by itself. It has no opinion about what is asked: prompts, the shape of the
 answers and what is done with them belong to the extension that asks.
 
 ![The AI settings page: the setup checks are in order, and a test of the connection has just answered with the chosen model](docs/images/settings-page.jpg)
