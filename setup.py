@@ -6,17 +6,20 @@ from setuptools import find_namespace_packages, setup
 
 HERE = Path(__file__).parent
 REPOSITORY = "https://github.com/bjornhagstrom/ckanext-ai-connector/blob/main/"
+RAW = "https://raw.githubusercontent.com/bjornhagstrom/ckanext-ai-connector/main/"
 
 
 def long_description():
-    """The README for PyPI, with links that work outside the repository."""
+    """The README for PyPI, with links and images that work outside the repository (an image needs the raw file, a page
+    of GitHub does not show as one)."""
     text = (HERE / "README.md").read_text(encoding="utf-8")
-    return re.sub(r"\]\((?!https?://|#|mailto:)([^)]+)\)", lambda m: "](" + REPOSITORY + m.group(1) + ")", text)
+    text = re.sub(r"!\[([^\]]*)\]\((?!https?://)([^)]+)\)", lambda m: "![" + m.group(1) + "](" + RAW + m.group(2) + ")", text)
+    return re.sub(r"(?<!!)\[([^\]]*)\]\((?!https?://|#|mailto:)([^)]+)\)", lambda m: "[" + m.group(1) + "](" + REPOSITORY + m.group(2) + ")", text)
 
 
 setup(
     name="ckanext-ai-connector",
-    version="0.1.0",
+    version="0.2.0",
     description="One AI connection (model, key, time limits) that CKAN extensions share, set up by a sysadmin",
     long_description=long_description(),
     long_description_content_type="text/markdown",

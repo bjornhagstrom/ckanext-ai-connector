@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-11-19 22:13+0100\n"
+"POT-Creation-Date: 2026-11-20 13:05+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: ckanext/ai_connector/actions.py:29 ckanext/ai_connector/keys.py:241
+#: ckanext/ai_connector/actions.py:29 ckanext/ai_connector/keys.py:247
 #: ckanext/ai_connector/settings.py:168
 msgid "Choose one of the allowed keys."
 msgstr ""
@@ -61,13 +61,18 @@ msgid ""
 "connector); version {installed} is installed."
 msgstr ""
 
-#: ckanext/ai_connector/api.py:64 ckanext/ai_connector/api.py:108
+#: ckanext/ai_connector/api.py:74 ckanext/ai_connector/api.py:149
 msgid ""
 "The AI connection (the ai_connector plugin) is not switched on. Add "
 "ai_connector to ckan.plugins."
 msgstr ""
 
-#: ckanext/ai_connector/api.py:70
+#: ckanext/ai_connector/api.py:93 ckanext/ai_connector/checks.py:99
+#: ckanext/ai_connector/client.py:160 ckanext/ai_connector/connection.py:171
+msgid "The AI model is missing from the configuration."
+msgstr ""
+
+#: ckanext/ai_connector/api.py:99
 msgid "The AI connection cannot be checked."
 msgstr ""
 
@@ -105,7 +110,7 @@ msgid "Choose a model on the AI settings page."
 msgstr ""
 
 #: ckanext/ai_connector/checks.py:46
-#: ckanext/ai_connector/templates/ai_connector/settings.html:180
+#: ckanext/ai_connector/templates/ai_connector/settings.html:182
 msgid "can read web pages itself"
 msgstr ""
 
@@ -128,7 +133,7 @@ msgstr ""
 msgid "Choose a model and a key of the same service on the AI settings page."
 msgstr ""
 
-#: ckanext/ai_connector/checks.py:61 ckanext/ai_connector/connection.py:124
+#: ckanext/ai_connector/checks.py:61 ckanext/ai_connector/connection.py:154
 msgid "A stored key cannot be read (the portal's secret has changed)."
 msgstr ""
 
@@ -142,7 +147,7 @@ msgstr ""
 
 #: ckanext/ai_connector/checks.py:64
 #: ckanext/ai_connector/templates/ai_connector/settings.html:13
-#: ckanext/ai_connector/templates/ai_connector/settings.html:102
+#: ckanext/ai_connector/templates/ai_connector/settings.html:104
 msgid "set on the server"
 msgstr ""
 
@@ -161,36 +166,58 @@ msgstr ""
 msgid "Enter a key on the AI settings page, or set it on the server."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:157 ckanext/ai_connector/connection.py:141
-msgid "The AI model is missing from the configuration."
+#: ckanext/ai_connector/checks.py:85
+#, python-brace-format
+msgid "Model for {purpose}"
 msgstr ""
 
-#: ckanext/ai_connector/client.py:200
+#: ckanext/ai_connector/checks.py:88
+msgid "Choose the model again on the AI settings page."
+msgstr ""
+
+#: ckanext/ai_connector/checks.py:92
+#, python-brace-format
+msgid ""
+"A model is chosen for {consumer}'s purpose {purpose}, which no installed "
+"extension declares."
+msgstr ""
+
+#: ckanext/ai_connector/checks.py:94
+msgid "Remove the choice on the AI settings page, or ignore it."
+msgstr ""
+
+#: ckanext/ai_connector/checks.py:103
+msgid ""
+"Choose a model and a key of the same service for it on the AI settings "
+"page."
+msgstr ""
+
+#: ckanext/ai_connector/client.py:203
 msgid "The chosen AI model cannot read web pages."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:202
+#: ckanext/ai_connector/client.py:205
 msgid "Only a public https address can be read by the AI service."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:209
+#: ckanext/ai_connector/client.py:212
 msgid "The page could not be read."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:230 ckanext/ai_connector/client.py:243
-#: ckanext/ai_connector/client.py:245
+#: ckanext/ai_connector/client.py:233 ckanext/ai_connector/client.py:246
+#: ckanext/ai_connector/client.py:248
 msgid "The AI service could not answer."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:260 ckanext/ai_connector/client.py:267
+#: ckanext/ai_connector/client.py:263 ckanext/ai_connector/client.py:272
 msgid "The AI service gave an answer in the wrong shape."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:269
+#: ckanext/ai_connector/client.py:275
 msgid "The requested shape of the answer is not a valid JSON schema."
 msgstr ""
 
-#: ckanext/ai_connector/client.py:281
+#: ckanext/ai_connector/client.py:287
 msgid ""
 "LiteLLM is not installed. Install ckanext-ai-connector again with its "
 "dependencies."
@@ -216,18 +243,25 @@ msgstr ""
 msgid "The AI timeout must be greater than zero."
 msgstr ""
 
-#: ckanext/ai_connector/connection.py:119
+#: ckanext/ai_connector/connection.py:121
+#, python-brace-format
+msgid ""
+"The key {name} chosen for {purpose} is not one of the allowed keys. "
+"Choose another on the AI settings page."
+msgstr ""
+
+#: ckanext/ai_connector/connection.py:149
 msgid "The name of the environment variable for the AI key is missing."
 msgstr ""
 
-#: ckanext/ai_connector/connection.py:127
+#: ckanext/ai_connector/connection.py:157
 #, python-brace-format
 msgid ""
 "The key {name} added on the settings page is missing or cannot be read. "
 "Enter it again."
 msgstr ""
 
-#: ckanext/ai_connector/connection.py:135
+#: ckanext/ai_connector/connection.py:165
 #, python-brace-format
 msgid "The environment variable '{name}' is missing or empty."
 msgstr ""
@@ -256,7 +290,7 @@ msgid ""
 "server to add it to the allowed keys."
 msgstr ""
 
-#: ckanext/ai_connector/keys.py:122 ckanext/ai_connector/keys.py:243
+#: ckanext/ai_connector/keys.py:122 ckanext/ai_connector/keys.py:249
 msgid "This does not look like an API key."
 msgstr ""
 
@@ -267,7 +301,7 @@ msgid ""
 "above instead of adding it under another name."
 msgstr ""
 
-#: ckanext/ai_connector/keys.py:127 ckanext/ai_connector/keys.py:254
+#: ckanext/ai_connector/keys.py:127 ckanext/ai_connector/keys.py:260
 msgid "Keys cannot be stored on this portal."
 msgstr ""
 
@@ -277,11 +311,42 @@ msgid ""
 " it."
 msgstr ""
 
-#: ckanext/ai_connector/keys.py:246
+#: ckanext/ai_connector/keys.py:143
+#, python-brace-format
+msgid "This key is chosen for: {purposes}. Choose another key for them first."
+msgstr ""
+
+#: ckanext/ai_connector/keys.py:252
 #, python-brace-format
 msgid ""
 "This looks like a {service} key, not the key of the chosen variable. "
 "Choose that key instead, or check what you pasted."
+msgstr ""
+
+#: ckanext/ai_connector/purposes.py:41
+msgid ""
+"A consumer with purposes is named with lower-case letters, digits and _ "
+"(2-64 characters)."
+msgstr ""
+
+#: ckanext/ai_connector/purposes.py:43
+msgid ""
+"A purpose is named with lower-case letters, digits and _ (1-40 "
+"characters)."
+msgstr ""
+
+#: ckanext/ai_connector/purposes.py:75
+#, python-brace-format
+msgid ""
+"A consumer's name and a purpose together may be at most {count} "
+"characters."
+msgstr ""
+
+#: ckanext/ai_connector/purposes.py:141
+#, python-brace-format
+msgid ""
+"The model chosen for {purpose} cannot be read. Choose it again on the AI "
+"settings page."
 msgstr ""
 
 #: ckanext/ai_connector/settings.py:160
@@ -292,45 +357,57 @@ msgstr ""
 msgid "Give a number of seconds between 1 and 600."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:28
+#: ckanext/ai_connector/views.py:73
 msgid "Not authorized."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:44
+#: ckanext/ai_connector/views.py:91
 msgid "The key and its name are removed."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:48
+#: ckanext/ai_connector/views.py:95
 msgid "The key entered here is removed."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:52
+#: ckanext/ai_connector/views.py:99
 msgid "Tick the box to confirm."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:61
+#: ckanext/ai_connector/views.py:108
 msgid ""
 "A name of your own is only for “Other service…”. Choose that, or empty "
 "the name."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:68
+#: ckanext/ai_connector/views.py:115
 msgid ""
 "The key is added. To use it, choose it under “API key” and write the "
 "model, then test the connection and save."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:70
+#: ckanext/ai_connector/views.py:117
 msgid ""
 "The key is saved. To use it, choose a model of its service above, then "
 "test the connection and save."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:78
+#: ckanext/ai_connector/views.py:132 ckanext/ai_connector/views.py:167
+msgid "Choose the API key for this model."
+msgstr ""
+
+#: ckanext/ai_connector/views.py:158
+msgid "The models for the purposes are saved and apply now."
+msgstr ""
+
+#: ckanext/ai_connector/views.py:175
+msgid "Write or choose a model to test, or leave it empty to use the main model."
+msgstr ""
+
+#: ckanext/ai_connector/views.py:183
 msgid "The AI settings from the server's configuration apply again."
 msgstr ""
 
-#: ckanext/ai_connector/views.py:106
+#: ckanext/ai_connector/views.py:211
 msgid "The AI settings are saved and apply now."
 msgstr ""
 
@@ -426,7 +503,7 @@ msgid "Other values saved here, and the API keys entered here, stay."
 msgstr ""
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:65
-#: ckanext/ai_connector/templates/ai_connector/settings.html:257
+#: ckanext/ai_connector/templates/ai_connector/settings.html:317
 msgid "Use the server's values"
 msgstr ""
 
@@ -434,127 +511,127 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:75
+#: ckanext/ai_connector/templates/ai_connector/settings.html:76
 #, python-format
 msgid "The AI answered in %(seconds)s s with the model %(model)s."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:76
+#: ckanext/ai_connector/templates/ai_connector/settings.html:77
 msgid "Test answer:"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:80
+#: ckanext/ai_connector/templates/ai_connector/settings.html:82
 msgid "The connection test failed:"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:96
+#: ckanext/ai_connector/templates/ai_connector/settings.html:98
 msgid "Manage API keys"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:102
+#: ckanext/ai_connector/templates/ai_connector/settings.html:104
 msgid "a key added here goes before it"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:107
+#: ckanext/ai_connector/templates/ai_connector/settings.html:109
 msgid "a key for another service; removing it removes the name too"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:108
+#: ckanext/ai_connector/templates/ai_connector/settings.html:110
 msgid "if removed, the server's key is used"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:109
+#: ckanext/ai_connector/templates/ai_connector/settings.html:111
 msgid "Remove"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:115
+#: ckanext/ai_connector/templates/ai_connector/settings.html:117
 msgid "None yet."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:119
+#: ckanext/ai_connector/templates/ai_connector/settings.html:121
 msgid "Add an API key"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:120
+#: ckanext/ai_connector/templates/ai_connector/settings.html:122
 msgid ""
 "Adds a key without changing the model, for example before you switch "
 "service. The key is stored encrypted, goes only to the service you choose"
 " as the model, and is never shown again, only its last four characters."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:125
+#: ckanext/ai_connector/templates/ai_connector/settings.html:127
 msgid "Service"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:128
+#: ckanext/ai_connector/templates/ai_connector/settings.html:130
 msgid "has a key: this one replaces it"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:130
+#: ckanext/ai_connector/templates/ai_connector/settings.html:132
 msgid "Other service…"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:134
+#: ckanext/ai_connector/templates/ai_connector/settings.html:136
 msgid "Name of the key"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:135
+#: ckanext/ai_connector/templates/ai_connector/settings.html:137
 msgid ""
 "Only for another service: a name of your own that ends in _API_KEY, such "
 "as ACME_API_KEY. It is a label, never looked up among the server's "
 "variables."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:140
+#: ckanext/ai_connector/templates/ai_connector/settings.html:142
 msgid "The key"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:146
+#: ckanext/ai_connector/templates/ai_connector/settings.html:148
 msgid "I understand that this key is sent to the service I choose as the model."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:149
+#: ckanext/ai_connector/templates/ai_connector/settings.html:151
 msgid "Add the key"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:160
+#: ckanext/ai_connector/templates/ai_connector/settings.html:162
 msgid ""
 "Start with the API key: add the key you got from your AI service under "
 "“Manage API keys” above. Then the model is chosen here, among that "
 "service's models."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:162
+#: ckanext/ai_connector/templates/ai_connector/settings.html:164
 msgid ""
 "There is no API key yet, and this portal keeps its keys in the server "
 "configuration. Ask whoever runs the server to add one."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:184
+#: ckanext/ai_connector/templates/ai_connector/settings.html:186
 msgid "Other model…"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:187
+#: ckanext/ai_connector/templates/ai_connector/settings.html:189
 #, python-brace-format
 msgid "Choose a model for {service}, then test the connection and save."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:188
+#: ckanext/ai_connector/templates/ai_connector/settings.html:190
 msgid ""
 "Write the model for this key: the service, a slash and the model. Then "
 "test the connection and save."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:189
+#: ckanext/ai_connector/templates/ai_connector/settings.html:191
 #, python-brace-format
 msgid "There is no API key for {service} yet: add one under “API keys” below."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:194
+#: ckanext/ai_connector/templates/ai_connector/settings.html:196
 msgid "A suggested model is chosen: check it, then test the connection and save."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:195
+#: ckanext/ai_connector/templates/ai_connector/settings.html:197
 msgid ""
 "The list holds the models for the services whose key is set. A newer "
 "model that is not in the list can be written in full under “Other model”,"
@@ -562,56 +639,111 @@ msgid ""
 "-flash-lite. Try it with “Test the connection”."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:196
+#: ckanext/ai_connector/templates/ai_connector/settings.html:198
 #, python-brace-format
 msgid "The portal talks to the AI services through LiteLLM {version}."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:209
+#: ckanext/ai_connector/templates/ai_connector/settings.html:211
 msgid "Choose an API key…"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:216
+#: ckanext/ai_connector/templates/ai_connector/settings.html:218
 msgid "Add, replace or remove API keys under “Manage API keys” below."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:217
+#: ckanext/ai_connector/templates/ai_connector/settings.html:219
 msgid ""
 "The keys are kept in the server configuration. Only their last four "
 "characters are shown, to tell them apart. To add or change a key, ask "
 "whoever runs the server."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:229
+#: ckanext/ai_connector/templates/ai_connector/settings.html:231
 msgid ""
 "How long to wait for the AI to answer an ordinary call. Usually a few "
 "seconds."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:230
+#: ckanext/ai_connector/templates/ai_connector/settings.html:232
 msgid ""
 "How long to wait when the AI service fetches a web page itself and reads "
 "it (models that can). That usually takes a few seconds but can take "
 "longer for large pages, so this limit is longer."
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:242
+#: ckanext/ai_connector/templates/ai_connector/settings.html:244
 msgid "Service address"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:242
+#: ckanext/ai_connector/templates/ai_connector/settings.html:244
 msgid "only in the server configuration"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:246
+#: ckanext/ai_connector/templates/ai_connector/settings.html:248
 msgid "Test the connection"
 msgstr ""
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:247
+#: ckanext/ai_connector/templates/ai_connector/settings.html:249
 msgid "Save"
 msgstr ""
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:259
+msgid "Models for different purposes"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:261
+msgid ""
+"An extension can use the AI for several things. Each can have a model of "
+"its own, for example a fast, inexpensive one for translation and a "
+"stronger one for reviews. Leave a model empty to use the main model "
+"above. The key is the one for the model's service, unless you choose "
+"another; it is never sent to another service."
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:262
+#, python-brace-format
+msgid "The main model is now {model}."
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:269
+#: ckanext/ai_connector/templates/ai_connector/settings.html:306
+msgid "Save the models for the purposes"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:280
+msgid ""
+"No installed extension uses this purpose now. Empty the model to remove "
+"the choice."
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:285
+msgid "The main model"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:286
+msgid "The saved choice cannot be read. Choose the model again."
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:289
+#, python-brace-format
+msgid "API key for {purpose}"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:290
+msgid "The key of the model's service"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:298
+#, python-brace-format
+msgid "Test the model for {purpose}"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:298
+msgid "Test"
+msgstr ""
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:319
 #, python-brace-format
 msgid "For: {fields}"
 msgstr ""

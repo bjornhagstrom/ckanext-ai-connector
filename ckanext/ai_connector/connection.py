@@ -94,6 +94,36 @@ class ConnectionSettings:
         with _settings.reading():
             return cls.from_values(_settings.current()).with_stored_key()
 
+    @classmethod
+    def for_purpose(cls, consumer, purpose=None):
+        """The connection for one of a consumer's purposes: the model and key chosen for it on the settings page, with the
+        main connection's time limits and AI server; the main connection when nothing is chosen. A choice that cannot be
+        read is refused (AIConfigurationError), not replaced by the main connection."""
+        from ckanext.ai_connector import purposes
+
+        with _settings.reading():
+            main = cls.in_use()
+            if not purpose:
+                return main
+            try:
+                chosen = purposes.choice(consumer, purpose)
+            except purposes.PurposeError as error:
+                raise AIConfigurationError(str(error)) from None
+            if chosen is None:
+                return main
+            if chosen.get("broken"):
+                raise AIConfigurationError(purposes.broken_reason(consumer, purpose))
+            from ckanext.ai_connector import keys
+
+            if chosen["api_key_env"] not in keys.allowed_key_envs():
+                # Checked when the choice was saved, and again here: the allowlist may have been narrowed since, a key
+                # added on the page removed, or the row written some other way. Never read another variable.
+                raise AIConfigurationError(_("The key {name} chosen for {purpose} is not one of the allowed keys. Choose "
+                                             "another on the AI settings page.").format(
+                                                 name=chosen["api_key_env"], purpose=purposes.label(consumer, purpose)))
+            return replace(main, model=chosen["model"], api_key_env=chosen["api_key_env"], api_key=None,
+                           environment_allowed=True, stored_unreadable=False).with_stored_key()
+
     def with_stored_key(self):
         from ckanext.ai_connector import keys
 

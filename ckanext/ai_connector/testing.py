@@ -107,35 +107,43 @@ if pytest is not None:
         ``api.is_ready()`` True and ``api.describe()`` the fake model, without the plugin, a model or a key. Set the answers
         with ``ai_connector_fake.answers = [...]`` (or a callable) before the code under test calls; the calls are in
         ``ai_connector_fake.calls``, the clients made in ``ai_connector_fake.clients``. Set ``ai_connector_fake.model`` for another
-        model (``"openai/..."`` has no ``page_read``)."""
+        model (``"openai/..."`` has no ``page_read``), and ``ai_connector_fake.models = {"purpose": "service/model"}`` for a
+        model per purpose (API 2); ``ai_connector_fake.purposes`` lists the purpose each client was made for."""
         from ckanext.ai_connector import api
         from ckanext.ai_connector.client import capabilities_of, service_of
 
         class Fake:
             answers: Any = ()
             model = "gemini/fake-model"
+            models: dict = {}
             calls: list = []
             clients: list = []
+            purposes: list = []
 
         state = Fake()
-        state.calls, state.clients = [], []
+        state.models, state.calls, state.clients, state.purposes = {}, [], [], []
 
-        def unavailable_reason(min_api=1):
+        def model_for(purpose):
+            return state.models.get(purpose) or state.model
+
+        def unavailable_reason(min_api=1, consumer=None, purpose=None):
             return api._too_old(min_api)
 
-        def describe():
-            return {"model": state.model, "service": service_of(state.model),
-                    "capabilities": sorted(capabilities_of(state.model)), "timeout_seconds": 30.0,
-                    "page_read_timeout_seconds": 180.0}
+        def describe(consumer=None, purpose=None):
+            model = model_for(purpose)
+            return {"model": model, "service": service_of(model), "capabilities": sorted(capabilities_of(model)),
+                    "timeout_seconds": 30.0, "page_read_timeout_seconds": 180.0}
 
         monkeypatch.setattr(api, "unavailable_reason", unavailable_reason)
-        monkeypatch.setattr(api, "is_ready", lambda min_api=1: unavailable_reason(min_api) is None)
+        monkeypatch.setattr(api, "is_ready",
+                            lambda min_api=1, consumer=None, purpose=None: unavailable_reason(min_api) is None)
         monkeypatch.setattr(api, "describe", describe)
 
-        def client(consumer, *, timeout_seconds=None, max_attempts=None):
-            made = fake_client(lambda call: _next(state, call), model=state.model, consumer=consumer,
+        def client(consumer, *, purpose=None, timeout_seconds=None, max_attempts=None):
+            made = fake_client(lambda call: _next(state, call), model=model_for(purpose), consumer=consumer,
                                max_attempts=max_attempts or 2, timeout_seconds=timeout_seconds or 30.0)
             state.clients.append(made)
+            state.purposes.append(purpose)
             return made
 
         monkeypatch.setattr(api, "client", client)

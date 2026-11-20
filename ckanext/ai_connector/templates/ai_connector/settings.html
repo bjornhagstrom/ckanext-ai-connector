@@ -72,11 +72,13 @@
   {% if test %}
     {% if test.success %}
       <div class="alert alert-success">
+        {% if test.purpose %}<strong>{{ test.purpose }}:</strong>{% endif %}
         {% trans model=test.model, seconds=h.localised_number(test.seconds) %}The AI answered in {{ seconds }} s with the model {{ model }}.{% endtrans %}
         {% if test.answer %}<br>{{ _('Test answer:') }} <q>{{ test.answer }}</q>{% endif %}
       </div>
     {% else %}
       <div class="alert alert-danger">
+        {% if test.purpose %}<strong>{{ test.purpose }}:</strong>{% endif %}
         {{ _('The connection test failed:') }} {{ test.error }}
         {% if test.hint %}<br>{{ test.hint }}{% endif %}
         {% if test.detail %}<br><small>{{ test.detail }}</small>{% endif %}
@@ -249,6 +251,64 @@
   </form>
   {% endif %}
 
+  {% if purpose_rows and not first_time %}
+  {#- Models for different purposes (API 2): an extension names what it uses the AI for, and each purpose may get a model
+      of its own. Empty: the main model above. The key follows the model's service unless another is chosen. -#}
+  {% set chosen_any = purpose_rows | selectattr('model') | list or purpose_rows | selectattr('broken') | list %}
+  <details class="mb-3 border rounded p-3 mt-4" id="purposes" {% if chosen_any or purpose_errors or (test and test.purpose) %}open{% endif %}>
+    <summary class="h5 mb-0" style="cursor: pointer">{{ _('Models for different purposes') }}</summary>
+    <div class="mt-3">
+      <p class="text-muted">{{ _('An extension can use the AI for several things. Each can have a model of its own, for example a fast, inexpensive one for translation and a stronger one for reviews. Leave a model empty to use the main model above. The key is the one for the model\'s service, unless you choose another; it is never sent to another service.') }}
+        {% if purpose_rows and purpose_rows[0].main_model %}{{ _('The main model is now {model}.').format(model=purpose_rows[0].main_model) }}{% endif %}</p>
+      <datalist id="ai-purpose-models">
+        {% for s in suggestions %}<option value="{{ s.model }}"></option>{% endfor %}
+      </datalist>
+      <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
+        {{ h.csrf_input() }}
+        {#- The form's default button (Enter in a field) is its first submit button: Save, not the first row's Test. -#}
+        <button type="submit" tabindex="-1" aria-hidden="true" style="position: absolute; left: -9999px;">{{ _('Save the models for the purposes') }}</button>
+        {% for consumer, rows in purpose_rows | groupby('consumer') %}
+          <fieldset class="mb-3">
+            <legend class="h6">{{ consumer }}</legend>
+            {% for row in rows %}
+              {% set model_field = 'purpose_model.' ~ row.id %}
+              {% set key_field = 'purpose_key.' ~ row.id %}
+              {% set shown_model = submitted_purposes.get(model_field, row.model) %}
+              {% set shown_key = submitted_purposes.get(key_field, row.api_key_env if row.model and not row.key_follows_model else '') %}
+              <div class="row g-2 align-items-start mb-3">
+                <div class="col-12"><label class="form-label mb-0" for="{{ model_field }}">{{ row.label }}</label>
+                  {% if not row.declared %}<small class="text-warning ms-2">{{ _('No installed extension uses this purpose now. Empty the model to remove the choice.') }}</small>{% endif %}
+                </div>
+                <div class="col-md-6">
+                  <input class="form-control" id="{{ model_field }}" name="{{ model_field }}" value="{{ shown_model }}"
+                         list="ai-purpose-models" autocomplete="off"
+                         placeholder="{{ _('The main model') }}">
+                  {% if row.broken %}<small class="text-danger d-block">{{ _('The saved choice cannot be read. Choose the model again.') }}</small>{% endif %}
+                </div>
+                <div class="col-md-4">
+                  <select class="form-control form-select" name="{{ key_field }}" aria-label="{{ _('API key for {purpose}').format(purpose=row.label) }}">
+                    <option value="" {% if not shown_key %}selected{% endif %}>{{ _('The key of the model\'s service') }}</option>
+                    {% for k in keys if k.set or k.name == shown_key %}
+                      <option value="{{ k.name }}" {% if k.name == shown_key %}selected{% endif %}>{{ key_text(k) }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <button class="btn btn-default btn-secondary" type="submit" name="purpose_test" value="{{ row.id }}"
+                          aria-label="{{ _('Test the model for {purpose}').format(purpose=row.label) }}">{{ _('Test') }}</button>
+                </div>
+                {% for e in errors['purpose.' ~ row.id] or [] %}<div class="col-12"><span class="error-block">{{ e }}</span></div>{% endfor %}
+              </div>
+            {% endfor %}
+          </fieldset>
+        {% endfor %}
+        <input type="hidden" name="step" value="save_purposes">
+        <button class="btn btn-primary" type="submit">{{ _('Save the models for the purposes') }}</button>
+      </form>
+    </div>
+  </details>
+  {% endif %}
+
 
   {% if resettable and not confirm_reset %}
     {# Only when a value saved here has a server value to go back to; values the server has none for stay. #}
@@ -266,6 +326,9 @@
   <form id="ai-key-add" method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
     {{ h.csrf_input() }}<input type="hidden" name="step" value="add_custom_key">
   </form>
+  {% if purpose_errors %}
+    <script>(function () { var box = document.getElementById('purposes'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); })();</script>
+  {% endif %}
   {% if errors.custom_name or errors.custom_key or errors.custom_confirm or errors.remove_key %}
     <script>{# after an error in the key forms the page opens at the top: go to the form again #}
       (function () { var form = document.getElementById('add-key'); if (form && form.scrollIntoView) form.scrollIntoView({ block: 'start' }); })();

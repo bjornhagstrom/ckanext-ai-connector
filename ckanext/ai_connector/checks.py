@@ -40,7 +40,7 @@ def run_checks():
         model_name = settings.value("model")
         if not model_name:
             return checks + [_check("ai_model", WARN, _("AI model"), _("No AI model is set, so nothing that needs the AI works."),
-                                    _("Choose a model on the AI settings page."))]
+                                    _("Choose a model on the AI settings page."))] + purpose_checks()
         detail = model_name
         if capabilities_of(model_name):
             detail += " (" + _("can read web pages itself") + ")"
@@ -70,4 +70,35 @@ def run_checks():
     else:
         checks.append(_check("ai_key", ERROR, _("API key"), _("No API key is found for the chosen key name."),
                              _("Enter a key on the AI settings page, or set it on the server.")))
-    return checks
+    return checks + purpose_checks()
+
+
+def purpose_checks():
+    """One check per model chosen for a purpose that cannot be used, or that no installed extension declares."""
+    from ckanext.ai_connector import purposes
+    from ckanext.ai_connector.client import AIError
+    from ckanext.ai_connector.connection import ConnectionSettings
+
+    found = []
+    with settings.reading():
+        for row in purposes.saved():
+            title = _("Model for {purpose}").format(purpose=row["label"])
+            if row.get("broken"):
+                found.append(_check("ai_purpose", ERROR, title, purposes.broken_reason(row["consumer"], row["purpose"]),
+                                    _("Choose the model again on the AI settings page.")))
+                continue
+            if not row["declared"]:
+                found.append(_check("ai_purpose", WARN, title,
+                                    _("A model is chosen for {consumer}'s purpose {purpose}, which no installed extension "
+                                      "declares.").format(consumer=row["consumer"], purpose=row["purpose"]),
+                                    _("Remove the choice on the AI settings page, or ignore it.")))
+                continue
+            try:
+                current = ConnectionSettings.for_purpose(row["consumer"], row["purpose"])
+                if not current.model:
+                    raise AIError(_("The AI model is missing from the configuration."))
+                current.key()
+            except AIError as error:
+                found.append(_check("ai_purpose", ERROR, title, str(error),
+                                    _("Choose a model and a key of the same service for it on the AI settings page.")))
+    return found

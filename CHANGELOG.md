@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file. The format
 is based on Keep a Changelog, and the project follows Semantic Versioning.
 
+## [Unreleased]
+
+## [0.2.0] - 2026-11-20
+
+### Added
+
+- **Models for different purposes (API 2).** A consumer names what it uses the AI for (`api.declare_purposes`) and asks
+  for a client for one of them (`api.client(consumer, purpose=...)`); a model and key chosen for that purpose apply, else
+  the main connection. `describe`, `unavailable_reason` and `is_ready` take the same `consumer` and `purpose`. A choice
+  follows the same rule as the main one (a known service's key only goes to its own models), checked when it is saved and
+  before every call; a choice that cannot be used is refused, not replaced by the main connection, and the setup checks
+  say so. The test fixture takes a model per purpose (`ai_connector_fake.models`).
+- **Models for different purposes on the AI settings page:** a row per declared purpose, grouped by extension, with a
+  model (empty: the main model), the key (the model's service's own unless another is chosen) and a Test per row. All
+  rows are checked before any is saved. A key added on the page under a name of its own cannot be removed while a purpose uses it.
+
 ## [0.1.0] - 2026-11-20
 
 ### Added

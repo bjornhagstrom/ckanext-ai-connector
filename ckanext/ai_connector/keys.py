@@ -136,6 +136,12 @@ def remove_custom_key(name, user=""):
         return
     if settings.value("api_key_env") == name:
         raise toolkit.ValidationError({"remove_key": [_("This key is the chosen one. Choose another key and save before you remove it.")]})
+    from ckanext.ai_connector import purposes
+
+    used = [row["label"] for row in purposes.saved() if row.get("api_key_env") == name]
+    if used:
+        raise toolkit.ValidationError({"remove_key": [_("This key is chosen for: {purposes}. Choose another key for them "
+                                                        "first.").format(purposes=", ".join(used))]})
     # The name first: a name without a key is a dead end, a key without a name is only an unused row.
     _save_custom_key_names([other for other in custom_key_names() if other != name])
     settings.delete_row(KEY_PREFIX + name)

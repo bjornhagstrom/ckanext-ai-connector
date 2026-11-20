@@ -14,7 +14,7 @@ answers and what is done with them belong to the extension that asks.
 
 ![The AI settings page: the setup checks are in order, and a test of the connection has just answered with the chosen model](docs/images/settings-page.jpg)
 
-Status: 0.1.0, the first release; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
+Status: 0.2.0; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
 
 ## Requirements
 
@@ -39,7 +39,8 @@ Status: 0.1.0, the first release; the API may still change before 1.0 (see [Vers
   for, and the model and the key only together, so a model is never left with another service's key. API keys entered on
   the page are not touched: they stay, and still go before the server's key for the same service, until they are removed
   under *Manage API keys*. The action `ai_connector_reset` does the same for every connection setting saved on the page,
-  and leaves the keys too.
+  and leaves the keys too. Models chosen under *Models for different purposes* stay as well; a purpose's model is
+  forgotten by emptying its field.
 
 A portal can use either layer alone: only the server's configuration (the page then shows it and can test it), or only
 the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts the keys).
@@ -52,8 +53,15 @@ the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts t
   chosen. Any other model can be written as LiteLLM writes it, `service/model`.
 - **Test the connection** tries the values in the form, with one short question to the service, without saving anything.
   When it fails, it says what the service's answer means (wrong key, unknown model, busy, quota used up).
+- **A model per purpose.** An extension that uses the AI for several things (for example reviews, translations and
+  reading web pages) names them, and *Models for different purposes* on the page offers a model for
+  each: a fast, inexpensive one for translation and a stronger one for reviews, say. Empty means the main model. The key
+  is the model's service's own unless another is chosen, and it never goes to another service; each row can be tested
+  on its own.
 
 ![With an Anthropic key chosen, the model list shows Anthropic's models only, and a line says what to do next](docs/images/models-follow-key.jpg)
+
+![Models for different purposes: the translation has a model of its own, the review and the reading of landing pages use the main model](docs/images/models-per-purpose.jpg)
 
 ### API keys
 
@@ -148,10 +156,11 @@ Import from `ckanext.ai_connector.api` only (and from `ckanext.ai_connector.test
 | Name | What it is |
 |---|---|
 | `API_VERSION` | An integer. It grows by one when something is added. |
-| `unavailable_reason(min_api=1)` | Why AI calls cannot be made here (plugin off, library missing, no model, no key, API too old), as a translated sentence for a sysadmin, or `None`. Never raises. |
-| `is_ready(min_api=1)` | `unavailable_reason(...) is None`. |
-| `describe()` | `{"model", "service", "capabilities", "timeout_seconds", "page_read_timeout_seconds"}` of the connection in use. Never the key or the address. |
-| `client(consumer, *, timeout_seconds=None, max_attempts=None)` | An `AIClient`. `consumer` is your extension's short name (`"my_extension"`): it is in every log line, and limits shared between extensions will be counted by it. `timeout_seconds` replaces the limit for ordinary calls (at most 600); `max_attempts` (default 2) is how often a call is tried after a transient failure. Raises `AIConfigurationError` when the connection cannot be used. |
+| `unavailable_reason(min_api=1, consumer=None, purpose=None)` | Why AI calls cannot be made here (plugin off, library missing, no model, no key, API too old), as a translated sentence for a sysadmin, or `None`. With `consumer` and `purpose` (API 2): for the model and key chosen for that purpose, if any. Never raises. |
+| `is_ready(min_api=1, consumer=None, purpose=None)` | `unavailable_reason(...) is None`. |
+| `describe(consumer=None, purpose=None)` | `{"model", "service", "capabilities", "timeout_seconds", "page_read_timeout_seconds"}` of the connection in use (for that purpose, API 2). Never the key or the address. |
+| `declare_purposes(consumer, purposes)` | API 2. Names what the consumer uses the AI for, `{"translate": label, ...}` (a label, or a function returning it in the page's language), so that a sysadmin can choose a model per purpose. Call it when the plugin loads. Purpose names: lower case, digits and `_`; consumer and purpose together at most 70 characters. |
+| `client(consumer, *, purpose=None, timeout_seconds=None, max_attempts=None)` | An `AIClient`. `consumer` is your extension's short name (`"my_extension"`): it is in every log line, and limits shared between extensions will be counted by it. `purpose` (API 2): the model and key chosen for it, else the main connection; a choice that cannot be used is refused, not replaced. `timeout_seconds` replaces the limit for ordinary calls (at most 600); `max_attempts` (default 2) is how often a call is tried after a transient failure. Raises `AIConfigurationError` when the connection cannot be used. |
 | `AIClient.text(messages, *, temperature=None, max_tokens=None, timeout=None)` | A plain answer: `AIResult`. |
 | `AIClient.structured(messages, schema, *, name="answer", temperature=None, max_tokens=None, timeout=None)` | An answer in the shape of a JSON schema (sent as a strict response format, and checked): `AIResult.data`. |
 | `AIClient.read_page(url, messages, *, schema=None, name="answer", temperature=None, max_tokens=None)` | **Experimental.** The model reads the public `https` page at `url` itself, during the call, and answers `messages` (which must name the address). Needs `"page_read"` in `capabilities` (today Gemini and Claude models). The page-read time limit applies. Raises `AIConfigurationError` before anything is sent when the model cannot read pages or the address is not public `https` (credentials, a private, loopback or bare host name), and `AIError` when the service answered without having read the page. |
@@ -226,6 +235,28 @@ To use the fixture, import it in your `conftest.py`: `from ckanext.ai_connector.
 settings calls `testing.clear_saved_settings()` afterwards: CKAN keeps one request open across tests, and the settings
 read in a request are kept for it.
 
+### Models for different purposes (API 2)
+
+An extension that uses the AI for several things can let a sysadmin choose a model for each, for example a fast, cheap
+one for translation and a stronger one for a review. Name the purposes when the plugin loads, and ask for a client for
+one of them:
+
+```python
+def update_config(self, config):
+    api.declare_purposes("my_extension", {"translate": lambda: toolkit._("Translation"),
+                                          "review": lambda: toolkit._("Review")})
+
+api.client("my_extension", purpose="translate").text(...)
+```
+
+Without a model chosen for it, a purpose uses the main connection, so nothing changes until a sysadmin chooses. Only the
+model and the key are chosen per purpose; the time limits and an own AI server are the connection's. The same rule
+applies as for the main model: a known service's key only goes to that service's models. A choice that can no longer
+be used (its key removed, its row unreadable) makes `client()` raise `AIConfigurationError` and the setup checks say
+why; it is never replaced by the main model behind the sysadmin's back. Pass the same `consumer` and `purpose` to
+`unavailable_reason()` before showing a button for it. In tests, `ai_connector_fake.models = {"translate": "..."}` gives a
+model per purpose, and `ai_connector_fake.purposes` lists the purpose each client was made for.
+
 ### Security for consumers
 
 - **Check access before every call.** The client checks nothing: a call costs money and sends data to a service outside
@@ -249,7 +280,7 @@ API.
 
 ### Versions
 
-0.x may still change the API; pin `ckanext-ai-connector>=0.1,<0.2` while it does. From 1.0, nothing in `api` is removed or
+0.x may still change the API; pin the minor version (for example `ckanext-ai-connector>=0.2,<0.3`) while it does. From 1.0, nothing in `api` is removed or
 changed within a major version, `API_VERSION` grows when something is added, and `read_page` stays experimental until it
 is marked stable.
 

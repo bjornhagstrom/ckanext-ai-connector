@@ -8,10 +8,55 @@ variable holds it, whether it is set and, for a long key, its last four characte
 from ckan.plugins import toolkit
 from flask import Blueprint
 
-from ckanext.ai_connector import checks, keys, settings
+from ckanext.ai_connector import checks, keys, purposes, settings
 from ckanext.ai_connector.localization import _
 
 blueprint = Blueprint("ai_connector", __name__)
+
+
+def _purpose_rows():
+    """The purposes the page offers a model for: every declared one, and every stored choice (also one that no installed
+    extension declares any more, so that it can be removed). Sorted by extension, then by label."""
+    from ckanext.ai_connector.connection import ConnectionSettings
+
+    stored = {(row["consumer"], row["purpose"]): row for row in purposes.saved()}
+    names = set(stored)
+    for consumer, declared in purposes.declared().items():
+        names.update((consumer, purpose) for purpose in declared)
+    main_model = ""
+    try:
+        main_model = ConnectionSettings.in_use().model
+    except Exception:
+        pass
+    rows = []
+    for consumer, purpose in names:
+        row = stored.get((consumer, purpose)) or {}
+        rows.append({"consumer": consumer, "purpose": purpose, "id": "%s.%s" % (consumer, purpose),
+                     "label": purposes.label(consumer, purpose),
+                     "declared": purpose in purposes.declared().get(consumer, {}),
+                     "model": row.get("model", ""), "api_key_env": row.get("api_key_env", ""),
+                     "broken": bool(row.get("broken")), "main_model": main_model,
+                     # The saved key is the one the model's service would get anyway: the form shows "the model's
+                     # service's key", so that changing the model to another service changes the key with it.
+                     "key_follows_model": bool(row.get("model")) and row.get("api_key_env") == _purpose_key(row.get("model", ""), "")})
+    return sorted(rows, key=lambda r: (r["consumer"], str(r["label"]).lower()))
+
+
+def _purpose_key(model, chosen):
+    """The key for a purpose's model: the one chosen in the form, else the model's own service's key, else (with an AI
+    server of one's own) the main connection's key, else "" (there is none: the row says so, and nothing is sent). Save and
+    Test both use this, so a test never falls back on a key that was not chosen for the row."""
+    if chosen:
+        return chosen
+    if not model:
+        return ""
+    if settings.value("api_base"):
+        # Every call goes to the AI server of one's own: the main connection's key is the one meant for it, not a known
+        # service's key that happens to be set (it would be sent to that server).
+        return settings.value("api_key_env")
+    from ckanext.ai_connector.connection import routed_service
+
+    return keys.PROVIDER_KEYS.get(routed_service(model), "")
 
 
 def _context():
@@ -33,6 +78,8 @@ def settings_page():
     if toolkit.request.method == "POST":
         submitted = {name: (toolkit.request.form.get(name) or "").strip() for name in settings.FIELDS}
         step = toolkit.request.form.get("step")
+        if step == "save_purposes" and toolkit.request.form.get("purpose_test"):
+            step = "test_purpose"   # the Test button of a row in the purposes' form
         if step == "remove_key":
             name = toolkit.request.form.get("key_name") or ""
             if keys.is_custom_key(name):
@@ -69,6 +116,64 @@ def settings_page():
                     else:
                         toolkit.h.flash_success(_("The key is saved. To use it, choose a model of its service above, then test the connection and save."))
                     return toolkit.redirect_to(here)   # at the top: the confirmation, and the model to choose next
+        if step == "save_purposes":
+            failed, changes = {}, []
+            for row in _purpose_rows():
+                model_name = (toolkit.request.form.get("purpose_model." + row["id"]) or "").strip()
+                key_name = _purpose_key(model_name, (toolkit.request.form.get("purpose_key." + row["id"]) or "").strip())
+                if model_name == row["model"] and key_name == row["api_key_env"] and not row["broken"]:
+                    continue   # unchanged (compared as resolved: "the model's service's key" is a key too)
+                try:
+                    purposes.row_key(row["consumer"], row["purpose"])   # a stored row with a name that cannot be saved
+                except purposes.PurposeError as error:
+                    failed["purpose." + row["id"]] = [str(error)]
+                    continue
+                if model_name and not key_name:
+                    failed["purpose." + row["id"]] = [_("Choose the API key for this model.")]
+                    continue
+                if model_name:
+                    # Checked for every row before anything is saved: either all the rows are saved, or none.
+                    from ckanext.ai_connector.connection import pairing_error
+
+                    try:
+                        settings.VALIDATORS["model"](model_name)
+                        settings.VALIDATORS["api_key_env"](key_name)
+                    except toolkit.Invalid as error:
+                        failed["purpose." + row["id"]] = [error.error]
+                        continue
+                    mismatch = pairing_error(model_name, key_name, settings.value("api_base"))
+                    if mismatch:
+                        failed["purpose." + row["id"]] = [mismatch]
+                        continue
+                changes.append((row, model_name, key_name))
+            for row, model_name, key_name in ([] if failed else changes):
+                try:
+                    purposes.save(row["consumer"], row["purpose"], model_name, key_name)
+                except (toolkit.Invalid, purposes.PurposeError) as error:
+                    failed["purpose." + row["id"]] = [getattr(error, "error", None) or str(error)]
+            if failed:
+                errors = failed
+                step = "none"
+            else:
+                toolkit.h.flash_success(_("The models for the purposes are saved and apply now."))
+                return toolkit.redirect_to(here)
+        if step == "test_purpose":
+            row_id = toolkit.request.form.get("purpose_test") or ""
+            row = next((r for r in _purpose_rows() if r["id"] == row_id), None)
+            model_name = (toolkit.request.form.get("purpose_model." + row_id) or "").strip() if row else ""
+            key_name = _purpose_key(model_name, (toolkit.request.form.get("purpose_key." + row_id) or "").strip())
+            if row and model_name and not key_name:
+                # No key for this model's service: say so, and send nothing (never the main connection's key instead).
+                errors = {"purpose." + row_id: [_("Choose the API key for this model.")]}
+            elif row and model_name:
+                try:
+                    test = toolkit.get_action("ai_connector_test")(context, {"model": model_name, "api_key_env": key_name})
+                    test["purpose"] = row["label"]
+                except toolkit.ValidationError as error:
+                    errors = {"purpose." + row_id: [v for values in error.error_dict.values() for v in values]}
+            elif row:
+                errors = {"purpose." + row_id: [_("Write or choose a model to test, or leave it empty to use the main model.")]}
+            step = "none"
         if step == "reset":
             # A first click changes nothing: the page shows what goes and what replaces it, and asks again.
             confirm_reset = True
@@ -145,4 +250,7 @@ def settings_page():
         "provider_keys": keys.PROVIDER_KEYS,
         "library_version": keys.library_version(),
         "api_base": settings.value("api_base"),
+        "purpose_rows": _purpose_rows(),
+        "purpose_errors": any(name.startswith("purpose.") for name in errors),
+        "submitted_purposes": dict(toolkit.request.form) if toolkit.request.method == "POST" else {},
     })
