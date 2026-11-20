@@ -1,0 +1,18 @@
+# Declared so CKAN knows the options. None has a default here on purpose: the code supplies its own. A value saved on the
+# settings page goes before the one here. See the README.
+version: 1
+groups:
+  - annotation: ckanext-ai-connector
+    options:
+      - key: ckanext.ai_connector.model
+        description: The AI model, written as LiteLLM writes it (service/name), for example gemini/gemini-3.5-flash-lite.
+      - key: ckanext.ai_connector.api_key_env
+        description: The name of the environment variable that holds the AI service's API key.
+      - key: ckanext.ai_connector.api_key_envs
+        description: Space-separated allowlist of variable names the settings page may choose the key from. Server configuration only.
+      - key: ckanext.ai_connector.api_base
+        description: The address of an AI server of your own (OpenAI-compatible). Server configuration only.
+      - key: ckanext.ai_connector.timeout_seconds
+        description: Time limit in seconds for an ordinary AI call (default 30, at most 600).
+      - key: ckanext.ai_connector.page_read_timeout_seconds
+        description: Longer time limit in seconds for a call in which the AI service reads a web page itself (default 180, at most 600).

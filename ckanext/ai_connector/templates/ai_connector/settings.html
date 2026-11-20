@@ -1,0 +1,274 @@
+{% extends "admin/base.html" %}
+
+{% set labels = {
+  'model': _('Model'),
+  'api_key_env': _('API key'),
+  'timeout_seconds': _('Time limit for an ordinary call, seconds'),
+  'page_read_timeout_seconds': _('Time limit for reading a web page, seconds'),
+} %}
+{% set by_name = {} %}
+{% for row in rows %}{% do by_name.update({row.name: row}) %}{% endfor %}
+
+{% macro key_text(k) %}{{ k.name }} –
+  {% if k.source == 'page' %}{{ _('entered here') }}{% elif k.source == 'server' %}{{ _('set on the server') }}{% else %}{{ _('missing') }}{% endif %}{% if k.tail %} (…{{ k.tail }}){% endif %}{% if k.unreadable %}, {{ _('a key entered here cannot be read, enter it again') }}{% endif %}{% endmacro %}
+
+{% macro origin(name) %}
+  {% set row = by_name[name] %}
+  {% if row.saved and row.default %}
+    {# Only when it matters: the server has a value of its own, and this one goes before it. #}
+    <small class="form-text text-muted d-block">{{ _('Applies instead of the server\'s value: {value}').format(value=row.default) }}</small>
+  {% endif %}
+  {% for e in errors[name] or [] %}<span class="error-block">{{ e }}</span>{% endfor %}
+{% endmacro %}
+
+{% block primary_content_inner %}
+  {% asset 'ai_connector/ai-connector-settings' %}
+  <h1>{{ _('AI settings') }}</h1>
+  <p>{{ _('The connection to an AI service that the portal\'s extensions share: model, key and time limits. Changes apply at once, for the whole portal, without a restart. Where nothing is saved here, the server default applies. What each extension asks the AI to do is set on that extension\'s own pages.') }}</p>
+
+  {% set problems = checks | selectattr('status', 'equalto', 'error') | list %}
+  <section class="mb-4" aria-labelledby="ai-setup-heading">
+    <h2 id="ai-setup-heading" class="h4">{{ _('Setup') }}</h2>
+    <p class="mb-2">
+      {% if problems %}{{ _('Something needs to be done before everything works:') }}
+      {% else %}{{ _('Everything needed is in place.') }}{% endif %}
+    </p>
+    <ul class="list-unstyled">
+      {% for check in checks %}
+        <li class="mb-1">
+          {% if check.status == 'ok' %}<span class="badge bg-success">{{ _('OK') }}</span>
+          {% elif check.status == 'warning' %}<span class="badge bg-warning text-dark">{{ _('Note') }}</span>
+          {% else %}<span class="badge bg-danger">{{ _('To do') }}</span>{% endif %}
+          <strong>{{ check.title }}</strong>
+          {% if check.detail %}<span class="text-muted">&ndash; {{ check.detail }}</span>{% endif %}
+          {% if check.fix %}<br><small class="ms-4">{{ _('What to do:') }} <code>{{ check.fix }}</code></small>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% if resettable and confirm_reset %}
+    {# The second step: what goes and what replaces it, before anything changes. #}
+    <div class="alert alert-warning" id="confirm-reset" role="alert" tabindex="-1">
+      <p class="mb-2"><strong>{{ _('Use the server\'s values? This changes:') }}</strong></p>
+      <table class="table table-sm mb-2">
+        <thead><tr><th scope="col">{{ _('Setting') }}</th><th scope="col">{{ _('Now (saved here)') }}</th><th scope="col">{{ _('Becomes (the server\'s)') }}</th></tr></thead>
+        <tbody>
+          {% for name in resettable %}
+            <tr><td>{{ labels[name] }}</td><td>{{ by_name[name].value }}</td><td>{{ by_name[name].default }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="small mb-2">{{ _('Other values saved here, and the API keys entered here, stay.') }}</p>
+      <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}" class="d-inline">
+        {{ h.csrf_input() }}
+        <button class="btn btn-warning" type="submit" name="step" value="reset_confirmed">{{ _('Use the server\'s values') }}</button>
+      </form>
+      <a class="btn btn-default btn-secondary ms-2" href="{{ h.url_for('ai_connector.settings_page') }}">{{ _('Cancel') }}</a>
+    </div>
+    <script>(function () { var box = document.getElementById('confirm-reset'); if (box) { box.focus(); } })();</script>
+  {% endif %}
+
+  {% if test %}
+    {% if test.success %}
+      <div class="alert alert-success">
+        {% trans model=test.model, seconds=h.localised_number(test.seconds) %}The AI answered in {{ seconds }} s with the model {{ model }}.{% endtrans %}
+        {% if test.answer %}<br>{{ _('Test answer:') }} <q>{{ test.answer }}</q>{% endif %}
+      </div>
+    {% else %}
+      <div class="alert alert-danger">
+        {{ _('The connection test failed:') }} {{ test.error }}
+        {% if test.hint %}<br>{{ test.hint }}{% endif %}
+        {% if test.detail %}<br><small>{{ test.detail }}</small>{% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% set keys_section %}
+  {% set entered = keys | selectattr('source', 'equalto', 'page') | list + keys | selectattr('unreadable') | list %}
+  {% set on_server = keys | selectattr('source', 'equalto', 'server') | list %}
+  {% set key_errors = errors.custom_name or errors.custom_key or errors.custom_confirm or errors.remove_key %}
+  {#- Everything about the API keys in one fold: the keys there are (entered here, and the server's), then adding or
+      replacing one. It sits inside the connection form, so its fields belong to two forms of their own outside it (the
+      form attribute; HTML has no nested forms): ai-key-remove and ai-key-add, at the end of the page. -#}
+  {% if entered or on_server or can_store_keys %}
+  <details class="mb-3 border rounded p-3" id="add-key" {% if first_time or not (entered or on_server) or key_errors %}open{% endif %}>
+    <summary class="h5 mb-0" style="cursor: pointer">{{ _('Manage API keys') }}</summary>
+    <div class="mt-3">
+    {% if entered or on_server %}
+      <ul class="list-unstyled">
+        {% for k in on_server %}
+          <li class="mb-2">{{ k.name }}{% if k.tail %} (…{{ k.tail }}){% endif %}
+            <small class="text-muted">– {{ _('set on the server') }}{% if can_store_keys %}; {{ _('a key added here goes before it') }}{% endif %}</small></li>
+        {% endfor %}
+        {% for k in entered | unique(attribute='name') %}
+          <li class="mb-2">
+            {{ k.name }}{% if k.tail %} (…{{ k.tail }}){% endif %}
+            {% if k.custom %}<small class="text-muted">– {{ _('a key for another service; removing it removes the name too') }}</small>
+            {% elif k.server_set %}<small class="text-muted">– {{ _('if removed, the server\'s key is used') }}{% if k.server_tail %} (…{{ k.server_tail }}){% endif %}</small>{% endif %}
+            <button class="btn btn-sm btn-default btn-secondary ms-2" type="submit" form="ai-key-remove" name="key_name" value="{{ k.name }}">{{ _('Remove') }}</button>
+          </li>
+        {% endfor %}
+      </ul>
+      {% for e in errors.remove_key or [] %}<span class="error-block">{{ e }}</span>{% endfor %}
+    {% elif can_store_keys %}
+      <p class="text-muted">{{ _('None yet.') }}</p>
+    {% endif %}
+
+    {% if can_store_keys %}
+      <h3 class="h6 mt-3">{{ _('Add an API key') }}</h3>
+      <p class="text-muted">{{ _('Adds a key without changing the model, for example before you switch service. The key is stored encrypted, goes only to the service you choose as the model, and is never shown again, only its last four characters.') }}</p>
+      {#- Chosen first: what was sent (after an error), else the first service without a key. -#}
+      {% set without_key = key_services | rejectattr('set') | list %}
+      {% set chosen_service = request.form.get('custom_service', (without_key or key_services or [{'env': 'other'}])[0].env) %}
+      <div class="form-group control-medium mb-3">
+        <label class="form-label" for="custom_service">{{ _('Service') }}</label>
+        <select class="form-control form-select" id="custom_service" name="custom_service" form="ai-key-add">
+          {% for row in key_services %}
+            <option value="{{ row.env }}" {% if chosen_service == row.env %}selected{% endif %}>{{ row.label }}{% if row.set %} – {{ _('has a key: this one replaces it') }}{% endif %}</option>
+          {% endfor %}
+          <option value="other" {% if chosen_service == 'other' %}selected{% endif %}>{{ _('Other service…') }}</option>
+        </select>
+      </div>
+      <div class="form-group control-medium mb-3" id="custom_name_group">
+        <label class="form-label" for="custom_name">{{ _('Name of the key') }}</label>
+        <small class="form-text text-muted d-block mb-1">{{ _('Only for another service: a name of your own that ends in _API_KEY, such as ACME_API_KEY. It is a label, never looked up among the server\'s variables.') }}</small>
+        <input class="form-control" id="custom_name" name="custom_name" form="ai-key-add" value="{{ request.form.get('custom_name', '') }}" placeholder="ACME_API_KEY" autocomplete="off" spellcheck="false">
+        {% for e in errors.custom_name or [] %}<span class="error-block">{{ e }}</span>{% endfor %}
+      </div>
+      <div class="form-group control-medium mb-3">
+        <label class="form-label" for="custom_key">{{ _('The key') }}</label>
+        <input class="form-control" id="custom_key" name="custom_key" form="ai-key-add" type="password" value="" autocomplete="new-password" spellcheck="false">
+        {% for e in errors.custom_key or [] %}<span class="error-block">{{ e }}</span>{% endfor %}
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="custom_confirm" name="custom_confirm" form="ai-key-add" value="1">
+        <label class="form-check-label checkbox" for="custom_confirm">{{ _('I understand that this key is sent to the service I choose as the model.') }}</label>
+        {% for e in errors.custom_confirm or [] %}<span class="error-block d-block">{{ e }}</span>{% endfor %}
+      </div>
+      <button class="btn btn-default btn-secondary" type="submit" form="ai-key-add">{{ _('Add the key') }}</button>
+    {% endif %}
+    </div>
+  </details>
+  {% endif %}
+  {% endset %}
+  {% if first_time %}{{ keys_section }}{% endif %}
+
+  {% if first_time %}
+    {#- First time: no key anywhere (and no AI server of one's own), so there is nothing to choose yet. -#}
+    {% if can_store_keys %}
+    <p class="alert alert-info">{{ _('Start with the API key: add the key you got from your AI service under “Manage API keys” above. Then the model is chosen here, among that service\'s models.') }}</p>
+    {% else %}
+    <p class="alert alert-info">{{ _('There is no API key yet, and this portal keeps its keys in the server configuration. Ask whoever runs the server to add one.') }}</p>
+    {% endif %}
+  {% else %}
+  <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
+    {{ h.csrf_input() }}
+
+    {% set model_block %}
+    <div class="form-group control-medium mb-3">
+      <label class="form-label" for="ai_model">{{ labels.model }}</label>
+      {% set known = suggestions | map(attribute='model') | list %}
+      {% set chosen_model = form.model or recommended %}
+      {% if suggestions %}
+        {#- The list follows the chosen API key: only that service's models (settings.js), with a suggested one. -#}
+        <select class="form-control form-select mb-2" id="ai_model_choice" aria-label="{{ labels.model }}" hidden
+                data-recommended="{{ h.dump_json(recommended_by_provider) }}" data-services="{{ h.dump_json(service_labels) }}">
+          {% for provider, group in suggestions | groupby('provider') %}
+            <optgroup label="{{ service_labels.get(provider, provider) }}" data-provider="{{ provider }}">
+              {% for s in group %}
+                <option value="{{ s.model }}" {% if s.model == chosen_model %}selected{% endif %}>{{ s.model }}{% if s.page_read %} – {{ _('can read web pages itself') }}{% endif %}</option>
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+          <option value="" {% if chosen_model not in known %}selected{% endif %}>{{ _('Other model…') }}</option>
+        </select>
+        <small class="form-text text-warning d-block mb-2" id="ai_model_for_key" hidden
+               data-text="{{ _('Choose a model for {service}, then test the connection and save.') }}"
+               data-other="{{ _('Write the model for this key: the service, a slash and the model. Then test the connection and save.') }}"
+               data-nokey="{{ _('There is no API key for {service} yet: add one under “API keys” below.') }}"></small>
+      {% endif %}
+      <input class="form-control" id="ai_model" name="model" value="{{ chosen_model }}" required
+             autocomplete="off" data-provider-keys="{{ h.dump_json(provider_keys) }}">
+      <small class="form-text text-muted">
+        {% if recommended %}<strong>{{ _('A suggested model is chosen: check it, then test the connection and save.') }}</strong>{% endif %}
+        {{ _('The list holds the models for the services whose key is set. A newer model that is not in the list can be written in full under “Other model”, as the service, a slash and the model, for example gemini/gemini-3.5-flash-lite. Try it with “Test the connection”.') }}
+        {% if library_version %}{{ _('The portal talks to the AI services through LiteLLM {version}.').format(version=library_version) }}{% endif %}
+      </small>
+      {{ origin('model') }}
+    </div>
+    {% endset %}
+    {% set key_block %}
+    {#- The key in use, chosen among the keys that are there; they are added, replaced and removed under "API keys" below.
+        Choosing a model chooses its service's key, and choosing a key shows that service's models (settings.js). -#}
+    <div class="form-group control-medium mb-3">
+      <label class="form-label" for="ai_api_key_env">{{ labels.api_key_env }}</label>
+      <select class="form-control form-select" id="ai_api_key_env" name="api_key_env">
+        {% if not form.api_key_env %}
+          {#- Nothing chosen: an empty choice, or the browser would pick the first key and send it to the model's service. -#}
+          <option value="" data-set="no" selected>{{ _('Choose an API key…') }}</option>
+        {% endif %}
+        {% for k in keys if k.set or k.name == form.api_key_env %}
+          <option value="{{ k.name }}" data-set="{{ 'yes' if k.set else 'no' }}" {% if k.name == form.api_key_env %}selected{% endif %}>{{ key_text(k) }}</option>
+        {% endfor %}
+      </select>
+      <small class="form-text text-muted d-block">
+        {% if can_store_keys %}{{ _('Add, replace or remove API keys under “Manage API keys” below.') }}
+        {% else %}{{ _('The keys are kept in the server configuration. Only their last four characters are shown, to tell them apart. To add or change a key, ask whoever runs the server.') }}{% endif %}
+      </small>
+      {{ origin('api_key_env') }}
+    </div>
+    {% endset %}
+    {{ model_block }}
+    {{ key_block }}
+
+
+    {{ keys_section }}
+
+    {% set timeout_help = {
+      'timeout_seconds': _('How long to wait for the AI to answer an ordinary call. Usually a few seconds.'),
+      'page_read_timeout_seconds': _('How long to wait when the AI service fetches a web page itself and reads it (models that can). That usually takes a few seconds but can take longer for large pages, so this limit is longer.'),
+    } %}
+    {% for name in ['timeout_seconds', 'page_read_timeout_seconds'] %}
+      <div class="form-group control-small mb-3">
+        <label class="form-label" for="{{ name }}">{{ labels[name] }}</label>
+        <input class="form-control" id="{{ name }}" name="{{ name }}" type="number" min="1" max="600" step="any" value="{{ form[name] }}" required>
+        <small class="form-text text-muted">{{ timeout_help[name] }}</small>
+        {{ origin(name) }}
+      </div>
+    {% endfor %}
+
+    {% if api_base %}
+      <p class="text-muted"><small>{{ _('Service address') }}: {{ api_base }} ({{ _('only in the server configuration') }})</small></p>
+    {% endif %}
+
+    <div class="form-actions">
+      <button class="btn btn-default btn-secondary" type="submit" name="step" value="test">{{ _('Test the connection') }}</button>
+      <button class="btn btn-primary" type="submit" name="step" value="save">{{ _('Save') }}</button>
+    </div>
+  </form>
+  {% endif %}
+
+
+  {% if resettable and not confirm_reset %}
+    {# Only when a value saved here has a server value to go back to; values the server has none for stay. #}
+    <form method="post" action="{{ h.url_for('ai_connector.settings_page') }}" class="mt-3">
+      {{ h.csrf_input() }}
+      <button class="btn btn-default btn-secondary" type="submit" name="step" value="reset">{{ _('Use the server\'s values') }}…</button>
+      {% set reset_labels = [] %}{% for name in resettable %}{% do reset_labels.append(labels[name]) %}{% endfor %}
+      <small class="text-muted ms-2">{{ _('For: {fields}').format(fields=reset_labels | join(', ')) }}</small>
+    </form>
+  {% endif %}
+  {#- The forms the fields under "Manage API keys" belong to (their form attribute). -#}
+  <form id="ai-key-remove" method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
+    {{ h.csrf_input() }}<input type="hidden" name="step" value="remove_key">
+  </form>
+  <form id="ai-key-add" method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
+    {{ h.csrf_input() }}<input type="hidden" name="step" value="add_custom_key">
+  </form>
+  {% if errors.custom_name or errors.custom_key or errors.custom_confirm or errors.remove_key %}
+    <script>{# after an error in the key forms the page opens at the top: go to the form again #}
+      (function () { var form = document.getElementById('add-key'); if (form && form.scrollIntoView) form.scrollIntoView({ block: 'start' }); })();
+    </script>
+  {% endif %}
+{% endblock %}

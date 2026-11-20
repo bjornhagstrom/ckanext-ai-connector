@@ -1,0 +1,4 @@
+ai-connector-settings:
+  output: ai_connector/%(version)s_settings.js
+  contents:
+    - js/settings.js

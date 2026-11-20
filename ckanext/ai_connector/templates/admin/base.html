@@ -1,0 +1,6 @@
+{% ckan_extends %}
+
+{% block content_primary_nav %}
+  {{ super() }}
+  {{ h.build_nav_icon('ai_connector.settings_page', _('AI settings'), icon='robot') }}
+{% endblock %}

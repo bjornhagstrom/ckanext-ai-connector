@@ -1,0 +1,8 @@
+include README.md LICENSE CHANGELOG.md SECURITY.md CONTRIBUTING.md AI_ASSISTANCE.md
+include ckanext/ai_connector/config_declaration.yaml
+recursive-include ckanext/ai_connector/templates *
+recursive-include ckanext/ai_connector/assets *
+recursive-include ckanext/ai_connector/i18n *
+include babel.cfg babel_ckan_tag_shims.py pytest.ini test.ini
+global-exclude *.py[cod]
+prune **/__pycache__
