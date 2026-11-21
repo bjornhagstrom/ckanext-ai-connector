@@ -69,7 +69,7 @@ the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts t
 
 ![With an Anthropic key chosen, the model list shows Anthropic's models only, and a line says what to do next](docs/images/models-follow-key.jpg)
 
-![Models for different purposes: the translation has a model of its own, the review and the reading of landing pages use the main model](docs/images/models-per-purpose.jpg)
+![Models for different purposes, grouped under the extension's name: the translation has a model of its own, the review and the reading of landing pages use the main model, and after Test all purposes each row says which model answered](docs/images/models-per-purpose.jpg)
 
 ### API keys
 
