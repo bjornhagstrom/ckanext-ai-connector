@@ -30,6 +30,7 @@ _CONSUMER = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 
 Label = Union[str, Callable[[], str]]
 _declared: dict[str, dict[str, Label]] = {}
+_names: dict[str, Label] = {}
 
 
 class PurposeError(ValueError):
@@ -43,25 +44,46 @@ def check_names(consumer: str, purpose: str) -> None:
         raise PurposeError(_("A purpose is named with lower-case letters, digits and _ (1-40 characters)."))
 
 
-def declare(consumer: str, purposes: Mapping[str, Label]) -> None:
-    """Make ``purposes`` (name -> label, or a function giving the label in the page's language) known for ``consumer``.
-    Declaring again adds to or replaces labels; nothing is stored."""
-    for name in purposes:
-        row_key(consumer, name)   # the names, and that they fit in a row's key
+def declare(consumer: str, purposes: Mapping[str, Label], name: Label | None = None) -> None:
+    """Make ``purposes`` (name -> label, or a function giving the label in the page's language) known for ``consumer``,
+    and ``name``, the extension's own name for the page (API 3). Declaring again adds to or replaces labels; nothing is
+    stored."""
+    for purpose in purposes:
+        row_key(consumer, purpose)   # the names, and that they fit in a row's key
     _declared.setdefault(consumer, {}).update(purposes)
+    if name:
+        _names[consumer] = name
 
 
 def declared() -> dict[str, dict[str, Label]]:
     return {consumer: dict(names) for consumer, names in _declared.items()}
 
 
-def label(consumer: str, purpose: str) -> str:
-    found = _declared.get(consumer, {}).get(purpose)
+def _text(found, fallback: str) -> str:
     try:
         found = found() if callable(found) else found
     except Exception:
         found = None
-    return str(found or purpose)
+    return str(found or fallback)
+
+
+def label(consumer: str, purpose: str) -> str:
+    return _text(_declared.get(consumer, {}).get(purpose), purpose)
+
+
+def consumer_name(consumer: str) -> str:
+    """The name an extension gave itself for the page, else its short name (``my_extension``)."""
+    return _text(_names.get(consumer), consumer)
+
+
+def source(consumer: str | None, purpose: str | None) -> str:
+    """``"purpose"`` when a model is chosen for the purpose (also one that cannot be used now), else ``"main"``."""
+    if not (consumer and purpose):
+        return "main"
+    try:
+        return "purpose" if choice(consumer, purpose) is not None else "main"
+    except PurposeError:
+        return "main"
 
 
 # CKAN's system_info.key is a varchar(100).

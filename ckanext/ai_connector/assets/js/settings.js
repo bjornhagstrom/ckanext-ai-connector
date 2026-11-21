@@ -175,6 +175,33 @@ function purposeKeyChoice(model, current, auto, options, providerKeys, onLoad) {
   });
 })();
 
+// "Changed, not saved" beside a purpose whose field differs from its saved model.
+(function () {
+  if (typeof document === "undefined") return;
+  Array.prototype.forEach.call(document.querySelectorAll("small[data-purpose-unsaved]"), function (note) {
+    var input = document.getElementById(note.getAttribute("data-purpose-unsaved"));
+    if (!input) return;
+    var update = function () { note.hidden = input.value.trim() === (input.getAttribute("data-saved") || ""); };
+    input.addEventListener("input", update);
+    input.addEventListener("change", update);
+  });
+})();
+
+// The × beside a purpose's model: empties the field (the main model), which also makes the browser list every model again
+// (it only shows those that match what is typed). The key follows, as when the field is emptied by hand.
+(function () {
+  if (typeof document === "undefined") return;
+  Array.prototype.forEach.call(document.querySelectorAll("button[data-purpose-clear]"), function (button) {
+    button.addEventListener("click", function () {
+      var input = document.getElementById(button.getAttribute("data-purpose-clear"));
+      if (!input) return;
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+  });
+})();
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { purposeKeyChoice: purposeKeyChoice };
 }

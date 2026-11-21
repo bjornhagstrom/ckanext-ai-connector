@@ -42,7 +42,9 @@ def _status_hint(code):
         return _("The AI service did not accept the key. Check that the key is right and that it is for the service of "
                  "the model.")
     if code == 404:
-        return _("The AI service does not know the model, or the key does not give access to it. Check the model's name.")
+        # Also a model the service has retired (Google first closes old models to new accounts, while still listing them).
+        return _("The AI service does not know the model, no longer offers it (old models are retired, sometimes first for "
+                 "new accounts), or the key does not give access to it. Check the name, or choose a newer model.")
     if code in (408, 504):
         return _("The AI service did not answer within the time limit. Choose a faster model (for example one called "
                  "\"lite\" or \"mini\"), or raise the time limit for an ordinary call.")
@@ -60,9 +62,17 @@ def ai_connector_test(context, data_dict):
     toolkit.check_access("ai_connector_settings", context, data_dict)
     try:
         current = settings_with(data_dict)
-        client = current.client("ai_connector_test", max_attempts=1)
     except AIError as error:
         return {"success": False, "error": str(error)}
+    return _try(current)
+
+
+def _try(current):
+    """One small call with a connection: whether it worked, how long it took, the answer, or the kind of error."""
+    try:
+        client = current.client("ai_connector_test", max_attempts=1)
+    except AIError as error:
+        return {"success": False, "error": str(error), "model": current.model}
     start = time.monotonic()
     try:
         answer = client.structured(_TEST_MESSAGES, _TEST_SCHEMA, name="connection_test", temperature=0.1).data
@@ -74,6 +84,58 @@ def ai_connector_test(context, data_dict):
                 "model": current.model}
     return {"success": True, "model": current.model, "answer": str(answer.get("answer") or ""),
             "seconds": round(time.monotonic() - start, 1)}
+
+
+def ai_connector_test_purposes(context, data_dict):
+    """Try the model every declared purpose uses: its own, or the main connection's. One small call per model and key
+    (purposes that share them share the answer); nothing is saved. ``consumer`` limits it to one extension's purposes, and
+    ``choices`` (``{"consumer.purpose": {"model", "api_key_env"}}``, the values typed on the page) are tried instead of
+    the saved ones; an empty model there is the main model. A list in the order of the page, each with ``consumer``,
+    ``purpose``, ``label``, ``source`` ("purpose" or "main") and the result of a test."""
+    from ckanext.ai_connector import purposes
+
+    toolkit.check_access("ai_connector_settings", context, data_dict)
+    choices = data_dict.get("choices") or {}
+    if not isinstance(choices, dict) or not all(isinstance(c, dict) for c in choices.values()):
+        raise toolkit.ValidationError({"choices": [_("Give the choices as {\"consumer.purpose\": {\"model\": ..., \"api_key_env\": ...}}.")]})
+    only = data_dict.get("consumer")
+    tried, results = {}, []
+    rows = [(consumer, purpose) for consumer, declared in purposes.declared().items() for purpose in declared
+            if not only or consumer == only]
+    for consumer, purpose in sorted(rows, key=lambda r: (r[0], purposes.label(*r).lower())):
+        typed = choices.get("%s.%s" % (consumer, purpose))
+        row = {"consumer": consumer, "purpose": purpose, "label": purposes.label(consumer, purpose),
+               "source": ("purpose" if typed.get("model") else "main") if typed is not None
+               else purposes.source(consumer, purpose)}
+        if typed is not None:
+            typed = {"model": str(typed.get("model") or "").strip(), "api_key_env": str(typed.get("api_key_env") or "").strip()}
+        if typed is not None and typed["model"]:
+            # Typed, not saved: checked as a save would check it, before anything is sent.
+            if not typed["api_key_env"]:
+                results.append(dict(row, success=False, error=_("Choose the API key for this model."), model=typed["model"]))
+                continue
+            from ckanext.ai_connector.connection import pairing_error
+
+            try:
+                typed = {"model": settings.VALIDATORS["model"](typed["model"]),
+                         "api_key_env": settings.VALIDATORS["api_key_env"](typed["api_key_env"])}
+            except toolkit.Invalid as error:
+                results.append(dict(row, success=False, error=error.error, model=typed["model"]))
+                continue
+            mismatch = pairing_error(typed["model"], typed["api_key_env"], settings.value("api_base"))
+            if mismatch:
+                results.append(dict(row, success=False, error=mismatch, model=typed["model"]))
+                continue
+        try:
+            current = ConnectionSettings.for_purpose(consumer, purpose, choice=typed)
+        except AIError as error:
+            results.append(dict(row, success=False, error=str(error), model=""))
+            continue
+        pair = (current.model, current.api_key_env, current.api_base)
+        if pair not in tried:
+            tried[pair] = _try(current)
+        results.append(dict(row, **tried[pair]))
+    return results
 
 
 def ai_connector_reset(context, data_dict):
@@ -94,7 +156,8 @@ def ai_connector_status(context, data_dict):
 
 
 def get_actions():
-    return {"ai_connector_test": ai_connector_test, "ai_connector_reset": ai_connector_reset, "ai_connector_status": ai_connector_status}
+    return {"ai_connector_test": ai_connector_test, "ai_connector_test_purposes": ai_connector_test_purposes,
+            "ai_connector_reset": ai_connector_reset, "ai_connector_status": ai_connector_status}
 
 
 def ai_settings_auth(context, data_dict):

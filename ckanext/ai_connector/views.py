@@ -32,7 +32,7 @@ def _purpose_rows():
     for consumer, purpose in names:
         row = stored.get((consumer, purpose)) or {}
         rows.append({"consumer": consumer, "purpose": purpose, "id": "%s.%s" % (consumer, purpose),
-                     "label": purposes.label(consumer, purpose),
+                     "label": purposes.label(consumer, purpose), "consumer_name": purposes.consumer_name(consumer),
                      "declared": purpose in purposes.declared().get(consumer, {}),
                      "model": row.get("model", ""), "api_key_env": row.get("api_key_env", ""),
                      "broken": bool(row.get("broken")), "main_model": main_model,
@@ -80,12 +80,14 @@ def settings_page():
 
     here = "ai_connector.settings_page"
     form = {row["name"]: row["value"] for row in settings.overview()}
-    errors, test, confirm_reset = {}, None, False
+    errors, test, confirm_reset, purpose_tests, focus_row = {}, None, False, None, ""
     if toolkit.request.method == "POST":
         submitted = {name: (toolkit.request.form.get(name) or "").strip() for name in settings.FIELDS}
         step = toolkit.request.form.get("step")
         if step == "save_purposes" and toolkit.request.form.get("purpose_test"):
             step = "test_purpose"   # the Test button of a row in the purposes' form
+        if step == "save_purposes" and toolkit.request.form.get("purposes_test_all"):
+            step = "test_purposes"   # "Test all purposes": the models in the fields, nothing is saved
         if step == "remove_key":
             name = toolkit.request.form.get("key_name") or ""
             if keys.is_custom_key(name):
@@ -161,11 +163,12 @@ def settings_page():
                 errors = failed
                 step = "none"
             else:
-                toolkit.h.flash_success(_("The models for the purposes are saved and apply now."))
-                return toolkit.redirect_to(here)
+                # Back to the section, with the confirmation there (a flash message is at the top of the page).
+                return toolkit.redirect_to(toolkit.h.url_for(here, saved="purposes") + "#purposes")
         if step == "test_purpose":
             row_id = toolkit.request.form.get("purpose_test") or ""
             row = next((r for r in _purpose_rows() if r["id"] == row_id), None)
+            focus_row = row_id if row else ""   # the page goes back to the row, also with an error
             model_name = (toolkit.request.form.get("purpose_model." + row_id) or "").strip() if row else ""
             key_name = _purpose_key(model_name, (toolkit.request.form.get("purpose_key." + row_id) or "").strip())
             if row and model_name and not key_name:
@@ -175,10 +178,31 @@ def settings_page():
                 try:
                     test = toolkit.get_action("ai_connector_test")(context, {"model": model_name, "api_key_env": key_name})
                     test["purpose"] = row["label"]
+                    test["purpose_id"] = row_id   # shown on the row, not at the top of the page
                 except toolkit.ValidationError as error:
                     errors = {"purpose." + row_id: [v for values in error.error_dict.values() for v in values]}
+            elif row and row["broken"]:
+                # The saved choice cannot be read: the purpose is refused in use, so the test says so, not the main model.
+                errors = {"purpose." + row_id: [purposes.broken_reason(row["consumer"], row["purpose"])]}
             elif row:
-                errors = {"purpose." + row_id: [_("Write or choose a model to test, or leave it empty to use the main model.")]}
+                # An empty field is the main model: that is what the purpose uses, so that is what is tested.
+                test = toolkit.get_action("ai_connector_test")(context, {})
+                test["purpose"] = row["label"]
+                test["purpose_id"] = row_id
+            step = "none"
+        if step == "test_purposes":
+            # What is in the fields, as the row's Test and "Test the connection" do; nothing is saved.
+            choices = {}
+            for row in _purpose_rows():
+                model_name = (toolkit.request.form.get("purpose_model." + row["id"]) or "").strip()
+                if row["broken"] and not model_name:
+                    continue   # the saved choice is tested as it is used: refused, not the main model
+                choices[row["id"]] = {"model": model_name, "api_key_env": _purpose_key(
+                    model_name, (toolkit.request.form.get("purpose_key." + row["id"]) or "").strip())}
+            only = toolkit.request.form.get("purposes_test_all")
+            purpose_tests = {"%s.%s" % (r["consumer"], r["purpose"]): r
+                             for r in toolkit.get_action("ai_connector_test_purposes")(
+                                 context, {"choices": choices, "consumer": None if only == "1" else only})}
             step = "none"
         if step == "reset":
             # A first click changes nothing: the page shows what goes and what replaces it, and asks again.
@@ -260,5 +284,8 @@ def settings_page():
         "api_base": settings.value("api_base"),
         "purpose_rows": _purpose_rows(),
         "purpose_errors": any(name.startswith("purpose.") for name in errors),
+        "purpose_tests": purpose_tests,
+        "purposes_saved": toolkit.request.args.get("saved") == "purposes",
+        "focus_row": focus_row,
         "submitted_purposes": dict(toolkit.request.form) if toolkit.request.method == "POST" else {},
     })

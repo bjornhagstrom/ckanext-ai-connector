@@ -14,7 +14,7 @@ answers and what is done with them belong to the extension that asks.
 
 ![The AI settings page: the setup checks are in order, and a test of the connection has just answered with the chosen model](docs/images/settings-page.jpg)
 
-Status: 0.2.1; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
+Status: 0.3.0; the API may still change before 1.0 (see [Versions](#versions)). Tested with CKAN 2.11 and 2.12, Python 3.10 to 3.14.
 
 ## Requirements
 
@@ -58,6 +58,14 @@ the page (the server needs nothing but CKAN's own `SECRET_KEY`, which encrypts t
   each: a fast, inexpensive one for translation and a stronger one for reviews, say. Empty means the main model. The key
   is the model's service's own unless another is chosen, and it never goes to another service; each row can be tested
   on its own.
+- **Which model each purpose uses.** The section is there also before any extension offers purposes, so that the
+  possibility is known. The purposes are grouped by extension, under the name the extension gives itself, with how many
+  have a model of their own. Each row says whether it has a model of its own or uses the main model (and which), and a
+  row's Test answers on the row. **Test all purposes** (and, with several extensions, a button per extension) tries the
+  models as they are in the fields at once, without saving, with one short call for each model and key, and shows the
+  answer or the error on each row. The action `ai_connector_test_purposes` does the same for sysadmins: the saved models,
+  or `choices` typed on the page, and `consumer` for one extension. The calls are made one after another while the page
+  waits, so with several models that do not answer it can take the time limit once for each.
 
 ![With an Anthropic key chosen, the model list shows Anthropic's models only, and a line says what to do next](docs/images/models-follow-key.jpg)
 
@@ -158,8 +166,8 @@ Import from `ckanext.ai_connector.api` only (and from `ckanext.ai_connector.test
 | `API_VERSION` | An integer. It grows by one when something is added. |
 | `unavailable_reason(min_api=1, consumer=None, purpose=None)` | Why AI calls cannot be made here (plugin off, library missing, no model, no key, API too old), as a translated sentence for a sysadmin, or `None`. With `consumer` and `purpose` (API 2): for the model and key chosen for that purpose, if any. Never raises. |
 | `is_ready(min_api=1, consumer=None, purpose=None)` | `unavailable_reason(...) is None`. |
-| `describe(consumer=None, purpose=None)` | `{"model", "service", "capabilities", "timeout_seconds", "page_read_timeout_seconds"}` of the connection in use (for that purpose, API 2). Never the key or the address. |
-| `declare_purposes(consumer, purposes)` | API 2. Names what the consumer uses the AI for, `{"translate": label, ...}` (a label, or a function returning it in the page's language), so that a sysadmin can choose a model per purpose. Call it when the plugin loads. Purpose names: lower case, digits and `_`; consumer and purpose together at most 70 characters. |
+| `describe(consumer=None, purpose=None)` | `{"model", "service", "capabilities", "timeout_seconds", "page_read_timeout_seconds", "source"}` of the connection in use (for that purpose, API 2). `source` (API 3) is `"purpose"` when a model is chosen for the purpose, also one that cannot be used now, and `"main"` when the main connection applies. Never the key or the address. |
+| `declare_purposes(consumer, purposes, *, name=None)` | API 2. Names what the consumer uses the AI for, `{"translate": label, ...}` (a label, or a function returning it in the page's language), so that a sysadmin can choose a model per purpose. Call it when the plugin loads. Purpose names: lower case, digits and `_`; consumer and purpose together at most 70 characters. `name` (API 3): the extension's name over its purposes on the page (a text or a function); without it, `consumer`. |
 | `client(consumer, *, purpose=None, timeout_seconds=None, max_attempts=None)` | An `AIClient`. `consumer` is your extension's short name (`"my_extension"`): it is in every log line, and limits shared between extensions will be counted by it. `purpose` (API 2): the model and key chosen for it, else the main connection; a choice that cannot be used is refused, not replaced. `timeout_seconds` replaces the limit for ordinary calls (at most 600); `max_attempts` (default 2) is how often a call is tried after a transient failure. Raises `AIConfigurationError` when the connection cannot be used. |
 | `AIClient.text(messages, *, temperature=None, max_tokens=None, timeout=None)` | A plain answer: `AIResult`. |
 | `AIClient.structured(messages, schema, *, name="answer", temperature=None, max_tokens=None, timeout=None)` | An answer in the shape of a JSON schema (sent as a strict response format, and checked): `AIResult.data`. |
@@ -243,8 +251,11 @@ one of them:
 
 ```python
 def update_config(self, config):
-    api.declare_purposes("my_extension", {"translate": lambda: toolkit._("Translation"),
-                                          "review": lambda: toolkit._("Review")})
+    purposes = {"translate": lambda: toolkit._("Translation"), "review": lambda: toolkit._("Review")}
+    if api.API_VERSION >= 3:   # the page names the extension over its purposes
+        api.declare_purposes("my_extension", purposes, name=lambda: toolkit._("My extension"))
+    else:
+        api.declare_purposes("my_extension", purposes)
 
 api.client("my_extension", purpose="translate").text(...)
 ```
@@ -254,7 +265,8 @@ model and the key are chosen per purpose; the time limits and an own AI server a
 applies as for the main model: a known service's key only goes to that service's models. A choice that can no longer
 be used (its key removed, its row unreadable) makes `client()` raise `AIConfigurationError` and the setup checks say
 why; it is never replaced by the main model behind the sysadmin's back. Pass the same `consumer` and `purpose` to
-`unavailable_reason()` before showing a button for it. In tests, `ai_connector_fake.models = {"translate": "..."}` gives a
+`unavailable_reason()` before showing a button for it, and to `describe()` to know which model it is and whether it was
+chosen for the purpose (`source`, API 3). In tests, `ai_connector_fake.models = {"translate": "..."}` gives a
 model per purpose, and `ai_connector_fake.purposes` lists the purpose each client was made for.
 
 ### Security for consumers
@@ -280,7 +292,7 @@ API.
 
 ### Versions
 
-0.x may still change the API; pin the minor version (for example `ckanext-ai-connector>=0.2,<0.3`) while it does. From 1.0, nothing in `api` is removed or
+0.x may still change the API; pin the minor version (for example `ckanext-ai-connector>=0.3,<0.4`) while it does. From 1.0, nothing in `api` is removed or
 changed within a major version, `API_VERSION` grows when something is added, and `read_page` stays experimental until it
 is marked stable.
 

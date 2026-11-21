@@ -25,9 +25,11 @@ def _keys(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "a-gemini-key-from-the-server")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "an-anthropic-key-from-the-server")
     purposes._declared.clear()
+    purposes._names.clear()
     api.declare_purposes("my_extension", {"translate": "Translation", "review": lambda: "Review"})
     yield
     purposes._declared.clear()
+    purposes._names.clear()
 
 
 def _seen_key(current):
@@ -36,7 +38,7 @@ def _seen_key(current):
 
 
 def test_the_api_version_grows_and_old_consumers_are_unchanged():
-    assert api.API_VERSION == 2 and api.unavailable_reason(min_api=2) is None
+    assert api.API_VERSION == 3 and api.unavailable_reason(min_api=3) is None
     assert api.client("my_extension").model == "gemini/main-model"
     assert api.client("my_extension", purpose="translate").model == "gemini/main-model"   # nothing chosen: the main one
 
@@ -114,6 +116,7 @@ def test_the_fake_fixture_takes_a_model_per_purpose(ai_connector_fake):
     assert api.client("my_extension").model == "gemini/fake-model"
     assert ai_connector_fake.purposes == ["translate", None]
     assert api.describe("my_extension", "translate")["service"] == "anthropic"
+    assert api.describe("my_extension", "translate")["source"] == "purpose" and api.describe()["source"] == "main"
 
 
 # --- after ckan-reviewer 2026-11-20 -------------------------------------------------------------------------------------
@@ -206,7 +209,11 @@ def test_the_test_button_of_a_row_tests_that_rows_model_without_saving(app, monk
         "purpose_key.my_extension.translate": ""}).body
     settings.forget_rows()
     assert seen == [("anthropic/claude-haiku-4-5", "an-anthropic-key-from-the-server")]
-    assert "Translation:" in page and purposes.choice("my_extension", "translate") is None
+    assert purposes.choice("my_extension", "translate") is None
+    # The answer is on the row (and the page goes there), not at the top of the page.
+    row = page.split('id="purpose-row.my_extension.translate"')[1].split('id="purpose-row.')[0]
+    assert "The connection test failed:" in row and "stop here" in row
+    assert page.count("The connection test failed:") == 1 and "purpose-row.my_extension.translate" in page.split("scrollIntoView")[0][-300:]
 
 
 def _post(app, headers, **rows):
@@ -308,3 +315,260 @@ def test_with_an_own_ai_server_the_page_tells_the_script_to_leave_the_keys_alone
     page = app.get("/ckan-admin/ai", headers=_headers()).body
     form = page[page.index('id="purposes-form"'):]
     assert 'data-api-base="yes"' in form[:form.index(">")]
+
+
+# --- an overview of the purposes (API 3, 0.3.0) --------------------------------------------------------------------------
+
+def test_describe_says_whether_a_purpose_has_a_model_of_its_own():
+    assert api.describe("my_extension", "translate")["source"] == "main"
+    assert api.describe()["source"] == "main"
+    purposes.save("my_extension", "translate", "anthropic/claude-haiku-4-5", "ANTHROPIC_API_KEY")
+    assert api.describe("my_extension", "translate")["source"] == "purpose"
+    assert api.describe("my_extension", "review")["source"] == "main"
+    # A choice that cannot be used is still the sysadmin's choice: not reported as the main model.
+    settings.write_row(purposes.row_key("my_extension", "review"), "not json")
+    broken = api.describe("my_extension", "review")
+    assert broken["model"] == "" and broken["source"] == "purpose"
+
+
+def test_an_extension_can_give_its_name_for_the_page():
+    assert purposes.consumer_name("my_extension") == "my_extension"
+    api.declare_purposes("my_extension", {}, name=lambda: "My extension")
+    assert purposes.consumer_name("my_extension") == "My extension"
+    assert purposes.label("my_extension", "translate") == "Translation"   # the purposes declared before stay
+
+
+def test_testing_all_purposes_calls_once_per_model_and_key_and_saves_nothing(monkeypatch):
+    from ckan.tests import factories, helpers
+
+    # review and landing share the main model and key: one call for both; summary cannot be read: no call.
+    api.declare_purposes("my_extension", {"landing": "Landing pages", "summary": "Summaries"})
+    purposes.save("my_extension", "translate", "anthropic/claude-haiku-4-5", "ANTHROPIC_API_KEY")
+    settings.write_row(purposes.row_key("my_extension", "summary"), "not json")
+    seen = []
+
+    class Client:
+        def __init__(self, model):
+            self.model = model
+
+        def structured(self, *args, **kwargs):
+            seen.append(self.model)
+            if self.model.startswith("anthropic/"):
+                raise api.AIError("refused", status_code=401)
+            return type("R", (), {"data": {"answer": "Paris"}})()
+
+    monkeypatch.setattr(ConnectionSettings, "client", lambda self, consumer, **o: Client(self.model))
+    found = helpers.call_action("ai_connector_test_purposes", {"user": factories.Sysadmin()["name"]})
+    by_purpose = {r["purpose"]: r for r in found}
+    assert sorted(seen) == ["anthropic/claude-haiku-4-5", "gemini/main-model"]   # two calls for four purposes
+    for shared in ("review", "landing"):
+        assert by_purpose[shared]["success"] and by_purpose[shared]["source"] == "main"
+        assert by_purpose[shared]["model"] == "gemini/main-model"
+    assert not by_purpose["translate"]["success"] and by_purpose["translate"]["source"] == "purpose"
+    assert "key" in by_purpose["translate"]["hint"]
+    assert not by_purpose["summary"]["success"] and "Summaries" in by_purpose["summary"]["error"]
+    assert purposes.choice("my_extension", "translate") == {"model": "anthropic/claude-haiku-4-5",
+                                                            "api_key_env": "ANTHROPIC_API_KEY"}
+
+
+def test_testing_all_purposes_is_for_sysadmins_only():
+    from ckan.tests import factories, helpers
+
+    with pytest.raises(toolkit.NotAuthorized):
+        helpers.call_action("ai_connector_test_purposes", {"user": factories.User()["name"], "ignore_auth": False})
+
+
+def test_the_page_shows_each_purposes_model_and_tests_them_all(app, monkeypatch):
+    api.declare_purposes("my_extension", {}, name="My extension")
+    purposes.save("my_extension", "translate", "anthropic/claude-haiku-4-5", "ANTHROPIC_API_KEY")
+    headers = _headers()
+    page = app.get("/ckan-admin/ai", headers=headers).body
+    assert "My extension" in page and "Models of their own: 1 of 2" in page
+    assert "Uses the main model (gemini/main-model)" in page and "A model of its own" in page
+    calls = []
+
+    class Client:
+        def __init__(self, model):
+            self.model = model
+
+        def structured(self, *args, **kwargs):
+            calls.append(self.model)
+            return type("R", (), {"data": {"answer": "Paris"}})()
+
+    monkeypatch.setattr(ConnectionSettings, "client", lambda self, consumer, **o: Client(self.model))
+    # What is in the fields is tested (typed, not saved), and nothing is saved; the typed value stays in its field.
+    page = app.post("/ckan-admin/ai", headers=headers, data={
+        "step": "save_purposes", "purposes_test_all": "1",
+        "purpose_model.my_extension.translate": "anthropic/claude-haiku-4-5", "purpose_key.my_extension.translate": "",
+        "purpose_model.my_extension.review": "anthropic/claude-sonnet-4-5", "purpose_key.my_extension.review": ""}).body
+    settings.forget_rows()
+    assert sorted(calls) == ["anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-5"]
+    assert "All 2 purposes answered." in page and page.count("✓") == 2
+    assert 'value="anthropic/claude-sonnet-4-5"' in page
+    assert purposes.choice("my_extension", "review") is None
+
+
+def test_testing_all_purposes_never_sends_a_key_to_another_services_model(monkeypatch):
+    """The real path (client and key not replaced): a row written with another service's key fails before any call."""
+    from ckan.tests import factories, helpers
+
+    from ckanext.ai_connector import client as client_module
+
+    sent = []
+    monkeypatch.setattr(client_module.AIClient, "structured", lambda self, *a, **k: sent.append(self.model) or type("R", (), {"data": {"answer": "Paris"}})())
+    settings.write_row(purposes.row_key("my_extension", "translate"),
+                       '{"model": "anthropic/claude-haiku-4-5", "api_key_env": "GEMINI_API_KEY"}')
+    found = {r["purpose"]: r for r in helpers.call_action("ai_connector_test_purposes",
+                                                          {"user": factories.Sysadmin()["name"]})}
+    assert not found["translate"]["success"] and "GEMINI_API_KEY" in found["translate"]["error"]
+    assert sent == ["gemini/main-model"]   # only the review, with the main model
+
+
+def test_the_page_says_so_when_there_is_no_purpose_to_test(app):
+    purposes._declared.clear()
+    purposes.save("gone_extension", "summary", "anthropic/claude-haiku-4-5", "ANTHROPIC_API_KEY")
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={"step": "save_purposes", "purposes_test_all": "1",
+                                                                 "purpose_model.gone_extension.summary": "anthropic/claude-haiku-4-5",
+                                                                 "purpose_key.gone_extension.summary": ""}).body
+    assert "nothing to test" in page and "scrollIntoView" in page
+
+
+def test_testing_all_purposes_checks_typed_values_as_a_save_would_and_sends_nothing_for_them(app, monkeypatch):
+    calls = []
+    monkeypatch.setattr(ConnectionSettings, "client", lambda self, consumer, **o: calls.append(self.model) or (_ for _ in ()).throw(api.AIError("stop")))
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purposes_test_all": "1",
+        "purpose_model.my_extension.translate": "anthropic/claude-haiku-4-5",
+        "purpose_key.my_extension.translate": "GEMINI_API_KEY",            # another service's key
+        "purpose_model.my_extension.review": "", "purpose_key.my_extension.review": ""}).body
+    assert calls == ["gemini/main-model"]   # only the review, on the main model
+    assert "1 of 2 purposes did not answer" not in page and "2 of 2 purposes did not answer" in page
+
+
+def test_the_section_is_there_without_purposes_and_saving_comes_back_to_it(app):
+    headers = _headers()
+    purposes._declared.clear()
+    page = app.get("/ckan-admin/ai", headers=headers).body
+    assert 'id="purposes"' in page and "No installed extension offers purposes of its own yet." in page
+    assert "Main model" in page
+    api.declare_purposes("my_extension", {"translate": "Translation"})
+    reply = app.post("/ckan-admin/ai", headers=headers, follow_redirects=False, data={
+        "step": "save_purposes", "purpose_model.my_extension.translate": "anthropic/claude-haiku-4-5",
+        "purpose_key.my_extension.translate": ""})
+    assert reply.status_code == 302 and reply.headers["Location"].endswith("?saved=purposes#purposes")
+    page = app.get("/ckan-admin/ai?saved=purposes", headers=headers).body
+    section = page.split('id="purposes"')[1]
+    assert "The models for the purposes are saved and apply now." in section and 'data-purpose-clear="purpose_model.my_extension.translate"' in section
+
+
+def test_with_several_extensions_each_has_its_own_test_button(app, monkeypatch):
+    api.declare_purposes("other_extension", {"summary": "Summaries"}, name="Other extension")
+    page = app.get("/ckan-admin/ai", headers=_headers()).body
+    assert 'name="purposes_test_all" value="other_extension"' in page and 'value="my_extension"' in page
+    calls = []
+
+    class Client:
+        model = None
+
+        def structured(self, *a, **k):
+            calls.append(1)
+            return type("R", (), {"data": {"answer": "Paris"}})()
+
+    monkeypatch.setattr(ConnectionSettings, "client", lambda self, consumer, **o: Client())
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purposes_test_all": "other_extension", "purpose_model.other_extension.summary": "",
+        "purpose_model.my_extension.translate": "", "purpose_model.my_extension.review": ""}).body
+    assert "All 1 purposes answered." in page and page.count("✓") == 1
+
+
+def test_a_rows_test_with_an_empty_field_tests_the_main_model_on_the_row(app, monkeypatch):
+    seen = []
+
+    def client(self, consumer, **options):
+        seen.append(self.model)
+        raise api.AIError("stop here")
+
+    monkeypatch.setattr(ConnectionSettings, "client", client)
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purpose_test": "my_extension.translate",
+        "purpose_model.my_extension.translate": "", "purpose_key.my_extension.translate": ""}).body
+    assert seen == ["gemini/main-model"]
+    assert 'document.getElementById("purpose-row.my_extension.translate")' in page   # a working script, not &#34;
+
+
+def test_a_row_says_when_its_field_differs_from_what_is_saved(app, monkeypatch):
+    from ckanext.ai_connector import client as client_module
+
+    def refused(self, *a, **k):
+        raise api.AIError("x", status_code=404)
+
+    monkeypatch.setattr(client_module.AIClient, "structured", refused)
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purpose_test": "my_extension.translate",
+        "purpose_model.my_extension.translate": "gemini/gemini-2.5-flash-lite", "purpose_key.my_extension.translate": "",
+        "purpose_model.my_extension.review": "", "purpose_key.my_extension.review": ""}).body
+    translate = page.split('id="purpose-row.my_extension.translate"')[1].split('id="purpose-row.')[0]
+    review = page.split('id="purpose-row.my_extension.review"')[1].split('id="purpose-row.')[0]
+    def note(html):
+        return html.split("data-purpose-unsaved")[1].split(">")[0]
+
+    assert "hidden" not in note(translate) and "hidden" in note(review)
+    assert "no longer offers it" in translate   # a retired model is named as a possible reason for a 404
+
+
+
+# --- after ckan-reviewer 2026-11-21 (second round) ----------------------------------------------------------------------
+
+def _sent(monkeypatch):
+    """The real path (client and key not replaced); only the call to the service is stopped and recorded."""
+    from ckanext.ai_connector import client as client_module
+
+    sent = []
+    monkeypatch.setattr(client_module.AIClient, "structured",
+                        lambda self, *a, **k: sent.append(self.model) or type("R", (), {"data": {"answer": "Paris"}})())
+    return sent
+
+
+def _test_all(choices, **extra):
+    from ckan.tests import factories, helpers
+
+    return {r["purpose"]: r for r in helpers.call_action("ai_connector_test_purposes", {"user": factories.Sysadmin()["name"]},
+                                                         choices=choices, **extra)}
+
+
+def test_a_typed_model_without_a_key_or_with_a_key_outside_the_allowlist_sends_nothing(monkeypatch):
+    sent = _sent(monkeypatch)
+    monkeypatch.setenv("SOME_OTHER_SECRET", "a-secret-that-is-not-an-ai-key-0042")
+    found = _test_all({"my_extension.translate": {"model": "groq/llama-x", "api_key_env": ""},
+                       "my_extension.review": {"model": "gemini/other", "api_key_env": "SOME_OTHER_SECRET"}})
+    assert sent == []
+    assert not found["translate"]["success"] and "Choose the API key" in found["translate"]["error"]
+    assert not found["review"]["success"]
+
+
+def test_a_saved_choice_that_cannot_be_read_fails_also_with_an_empty_field(app, monkeypatch):
+    sent = _sent(monkeypatch)
+    settings.write_row(purposes.row_key("my_extension", "review"), "not json")
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purposes_test_all": "1",
+        "purpose_model.my_extension.translate": "", "purpose_key.my_extension.translate": "",
+        "purpose_model.my_extension.review": "", "purpose_key.my_extension.review": ""}).body
+    assert "1 of 2 purposes did not answer" in page and sent == ["gemini/main-model"]
+    page = app.post("/ckan-admin/ai", headers=_headers(), data={
+        "step": "save_purposes", "purpose_test": "my_extension.review",
+        "purpose_model.my_extension.review": "", "purpose_key.my_extension.review": ""}).body
+    assert "cannot be read" in page and sent == ["gemini/main-model"]   # no call for the row's own Test
+
+
+def test_choices_of_the_wrong_shape_are_a_validation_error():
+    with pytest.raises(toolkit.ValidationError):
+        _test_all(["my_extension.translate"])
+    with pytest.raises(toolkit.ValidationError):
+        _test_all({"my_extension.translate": "gemini/x"})
+
+
+def test_before_any_key_the_section_says_to_set_up_the_main_model_first(app, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY")
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    page = app.get("/ckan-admin/ai", headers=_headers()).body
+    assert "Set up the main model above first" in page and 'name="purpose_model.my_extension.translate"' not in page

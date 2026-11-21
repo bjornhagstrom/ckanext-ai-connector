@@ -5,6 +5,25 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
+### Added
+
+- **An overview of the purposes on the AI settings page:** each row says whether it has a model of its own or uses the
+  main model (and which), each extension's group says how many have a model of their own, and **Test all purposes** tries
+  the models in the fields at once (one short call for each model and key; nothing is saved), with the answer or the
+  error on each row; with several extensions each has a button of its own. The action `ai_connector_test_purposes` does
+  the same, for sysadmins.
+
+### Changed
+
+- The section *Models for different purposes* is shown also when no extension offers purposes, and says how an
+  extension gets there. A row's Test answers on the row, and saving the purposes comes back to the section with the
+  confirmation there. A × beside a purpose's model empties it, which also shows the whole list of models again (the
+  browser shows only the models that match what is typed). The connection's model is called *Main model*.
+- **API 3:** `describe()` tells whether a purpose has a model of its own (`source`: `"purpose"` or `"main"`), and
+  `declare_purposes(..., name=...)` gives the extension's name for the page. Consumers of API 1 and 2 are unchanged.
+
 ## [0.2.1] - 2026-11-20
 
 ### Changed

@@ -19,7 +19,7 @@ def long_description():
 
 setup(
     name="ckanext-ai-connector",
-    version="0.2.1",
+    version="0.3.0",
     description="One AI connection (model, key, time limits) that CKAN extensions share, set up by a sysadmin",
     long_description=long_description(),
     long_description_content_type="text/markdown",

@@ -39,12 +39,12 @@ def run_checks():
     with settings.reading():
         model_name = settings.value("model")
         if not model_name:
-            return checks + [_check("ai_model", WARN, _("AI model"), _("No AI model is set, so nothing that needs the AI works."),
+            return checks + [_check("ai_model", WARN, _("Main model"), _("No AI model is set, so nothing that needs the AI works."),
                                     _("Choose a model on the AI settings page."))] + purpose_checks()
         detail = model_name
         if capabilities_of(model_name):
             detail += " (" + _("can read web pages itself") + ")"
-        checks.append(_check("ai_model", OK, _("AI model"), detail))
+        checks.append(_check("ai_model", OK, _("Main model"), detail))
         env = settings.value("api_key_env")
         row = next((r for r in keys.key_status() if r["name"] == env), None)
         api_base = settings.value("api_base")

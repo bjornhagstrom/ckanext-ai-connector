@@ -371,7 +371,7 @@ def test_ready_needs_a_model_and_a_key_and_says_why_not(monkeypatch):
 def test_describe_tells_what_the_connection_can_do_and_never_the_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", SECRET)
     assert api.describe() == {"model": "gemini/test", "service": "gemini", "capabilities": ["page_read"],
-                              "timeout_seconds": 20.0, "page_read_timeout_seconds": 180.0}
+                              "timeout_seconds": 20.0, "page_read_timeout_seconds": 180.0, "source": "main"}
 
 
 @pytest.mark.ckan_config(P + "model", "gemini/test")
@@ -462,7 +462,7 @@ def test_the_page_offers_the_server_s_values_only_for_what_the_server_has_and_re
     page = " ".join(app.get("/ckan-admin/ai", headers=headers).body.split())
     assert "Applies instead of the server's value: gemini/server-value" in page or \
         "Applies instead of the server&#39;s value: gemini/server-value" in page
-    assert 'value="reset"' in page and "For: Model" in page and "For: Model," not in page   # the time limit has no server value
+    assert 'value="reset"' in page and "For: Main model" in page and "For: Main model," not in page   # the time limit has no server value
 
     page = " ".join(app.post("/ckan-admin/ai", data={"step": "reset"}, headers=headers).body.split())
     settings.forget_rows()

@@ -1,7 +1,7 @@
 {% extends "admin/base.html" %}
 
 {% set labels = {
-  'model': _('Model'),
+  'model': _('Main model'),
   'api_key_env': _('API key'),
   'timeout_seconds': _('Time limit for an ordinary call, seconds'),
   'page_read_timeout_seconds': _('Time limit for reading a web page, seconds'),
@@ -69,7 +69,7 @@
     <script>(function () { var box = document.getElementById('confirm-reset'); if (box) { box.focus(); } })();</script>
   {% endif %}
 
-  {% if test %}
+  {% if test and not test.purpose_id %}
     {% if test.success %}
       <div class="alert alert-success">
         {% if test.purpose %}<strong>{{ test.purpose }}:</strong>{% endif %}
@@ -251,15 +251,32 @@
   </form>
   {% endif %}
 
-  {% if purpose_rows and not first_time %}
   {#- Models for different purposes (API 2): an extension names what it uses the AI for, and each purpose may get a model
-      of its own. Empty: the main model above. The key follows the model's service unless another is chosen. -#}
+      of its own. Empty: the main model above. The key follows the model's service unless another is chosen. The heading is
+      there also without any purpose, so that a sysadmin knows the possibility exists. -#}
   {% set chosen_any = purpose_rows | selectattr('model') | list or purpose_rows | selectattr('broken') | list %}
-  <details class="mb-3 border rounded p-3 mt-4" id="purposes" {% if chosen_any or purpose_errors or (test and test.purpose) %}open{% endif %}>
+  {% set many_groups = (purpose_rows | map(attribute='consumer') | unique | list | length) > 1 %}
+  <details class="mb-3 border rounded p-3 mt-4" id="purposes" {% if chosen_any or purpose_errors or purpose_tests is not none or purposes_saved or (test and test.purpose) %}open{% endif %}>
     <summary class="h5 mb-0" style="cursor: pointer">{{ _('Models for different purposes') }}</summary>
     <div class="mt-3">
       <p class="text-muted">{{ _('An extension can use the AI for several things. Each can have a model of its own, for example a fast, inexpensive one for translation and a stronger one for reviews. Leave a model empty to use the main model above. The key is the one for the model\'s service, unless you choose another; it is never sent to another service.') }}
         {% if purpose_rows and purpose_rows[0].main_model %}{{ _('The main model is now {model}.').format(model=purpose_rows[0].main_model) }}{% endif %}</p>
+      <p class="text-muted">{{ _('An extension that offers this lists its purposes here. An extension that does not uses the main model, and is not listed.') }}</p>
+      {% if purposes_saved %}<div class="alert alert-success" role="status">{{ _('The models for the purposes are saved and apply now.') }}</div>{% endif %}
+      {% if not purpose_rows %}<p class="mb-0"><em>{{ _('No installed extension offers purposes of its own yet.') }}</em></p>
+      {% elif first_time %}<p class="mb-0"><em>{{ _('Set up the main model above first; then a model can be chosen for each purpose.') }}</em></p>{% endif %}
+      {% if purpose_tests is not none %}
+        {#- "Test all purposes": one line over the rows; each row says what it answered. -#}
+        {% set failed = purpose_tests.values() | rejectattr('success') | list %}
+        {% if not purpose_tests %}
+          <div class="alert alert-info" role="status">{{ _('No installed extension names a purpose, so there was nothing to test.') }}</div>
+        {% elif failed %}
+          <div class="alert alert-danger" role="status">{{ _('{failed} of {count} purposes did not answer. See the rows below.').format(failed=failed | length, count=purpose_tests | length) }}</div>
+        {% else %}
+          <div class="alert alert-success" role="status">{{ _('All {count} purposes answered. Nothing was saved.').format(count=purpose_tests | length) }}</div>
+        {% endif %}
+      {% endif %}
+      {% if purpose_rows and not first_time %}
       <datalist id="ai-purpose-models">
         {% for s in suggestions %}<option value="{{ s.model }}"></option>{% endfor %}
       </datalist>
@@ -269,21 +286,50 @@
         {#- The form's default button (Enter in a field) is its first submit button: Save, not the first row's Test. -#}
         <button type="submit" tabindex="-1" aria-hidden="true" style="position: absolute; left: -9999px;">{{ _('Save the models for the purposes') }}</button>
         {% for consumer, rows in purpose_rows | groupby('consumer') %}
+          {% set own = rows | selectattr('model') | list + rows | selectattr('broken') | list %}
           <fieldset class="mb-3">
-            <legend class="h6">{{ consumer }}</legend>
+            <legend class="h6">{{ rows[0].consumer_name }}
+              <small class="text-muted fw-normal ms-2">{{ _('Models of their own: {own} of {count}').format(own=own | length, count=rows | length) }}</small></legend>
+            {% if many_groups %}
+              <button class="btn btn-default btn-secondary btn-sm mb-2" type="submit" name="purposes_test_all" value="{{ consumer }}">{{ _('Test the purposes of {extension}').format(extension=rows[0].consumer_name) }}</button>
+            {% endif %}
             {% for row in rows %}
               {% set model_field = 'purpose_model.' ~ row.id %}
               {% set key_field = 'purpose_key.' ~ row.id %}
               {% set shown_model = submitted_purposes.get(model_field, row.model) %}
               {% set shown_key = submitted_purposes.get(key_field, row.api_key_env if row.model and not row.key_follows_model else '') %}
-              <div class="row g-2 align-items-start mb-3">
+              <div class="row g-2 align-items-start mb-3" id="purpose-row.{{ row.id }}">
                 <div class="col-12"><label class="form-label mb-0" for="{{ model_field }}">{{ row.label }}</label>
-                  {% if not row.declared %}<small class="text-warning ms-2">{{ _('No installed extension uses this purpose now. Empty the model to remove the choice.') }}</small>{% endif %}
+                  {% if not row.declared %}<small class="text-warning ms-2">{{ _('No installed extension uses this purpose now. Empty the model to remove the choice.') }}</small>
+                  {% elif row.model or row.broken %}<small class="text-muted ms-2">{{ _('A model of its own') }}</small>
+                  {% else %}<small class="text-muted ms-2">{{ _('Uses the main model') }}{% if row.main_model %} ({{ row.main_model }}){% endif %}</small>{% endif %}
+                  {#- The status above is what is saved; when the field says something else, the row says so (the script keeps it up to date). -#}
+                  <small class="text-warning fw-bold ms-2" data-purpose-unsaved="{{ model_field }}" {% if shown_model == row.model %}hidden{% endif %}>{{ _('Changed, not saved') }}</small>
+                  {% set tried = (purpose_tests or {}).get(row.id) %}
+                  {% if tried and tried.success %}
+                    <small class="text-success d-block">✓ {% trans model=tried.model, seconds=h.localised_number(tried.seconds) %}Answered in {{ seconds }} s with {{ model }}.{% endtrans %}</small>
+                  {% elif tried %}
+                    <small class="text-danger d-block">✗ {{ tried.error }}{% if tried.hint %} {{ tried.hint }}{% endif %}{% if tried.detail %} ({{ tried.detail }}){% endif %}</small>
+                  {% endif %}
+                  {% if test and test.purpose_id == row.id %}
+                    {#- The row's own Test: its answer here, where the button is. -#}
+                    {% if test.success %}
+                      <small class="text-success d-block">✓ {% trans model=test.model, seconds=h.localised_number(test.seconds) %}Answered in {{ seconds }} s with {{ model }}.{% endtrans %}{% if test.answer %} {{ _('Test answer:') }} <q>{{ test.answer }}</q>{% endif %}</small>
+                    {% else %}
+                      <small class="text-danger d-block">✗ {{ _('The connection test failed:') }} {{ test.error }}{% if test.hint %} {{ test.hint }}{% endif %}{% if test.detail %} ({{ test.detail }}){% endif %}</small>
+                    {% endif %}
+                  {% endif %}
                 </div>
                 <div class="col-md-6">
-                  <input class="form-control" id="{{ model_field }}" name="{{ model_field }}" value="{{ shown_model }}"
-                         list="ai-purpose-models" autocomplete="off" data-purpose-key="{{ key_field }}"
-                         placeholder="{{ _('The main model') }}">
+                  <div class="input-group">
+                    <input class="form-control" id="{{ model_field }}" name="{{ model_field }}" value="{{ shown_model }}" data-saved="{{ row.model }}"
+                           list="ai-purpose-models" autocomplete="off" data-purpose-key="{{ key_field }}"
+                           placeholder="{{ _('The main model') }}">
+                    {#- The browser's list shows only the models that match what is in the field: emptying it shows them all. -#}
+                    <button class="btn btn-default btn-outline-secondary" type="button" data-purpose-clear="{{ model_field }}"
+                            title="{{ _('Empty the field: the main model, and every model in the list') }}"
+                            aria-label="{{ _('Empty the model for {purpose}').format(purpose=row.label) }}">×</button>
+                  </div>
                   {% if row.broken %}<small class="text-danger d-block">{{ _('The saved choice cannot be read. Choose the model again.') }}</small>{% endif %}
                 </div>
                 <div class="col-md-4">
@@ -306,10 +352,12 @@
         {% endfor %}
         <input type="hidden" name="step" value="save_purposes">
         <button class="btn btn-primary" type="submit">{{ _('Save the models for the purposes') }}</button>
+        <button class="btn btn-default btn-secondary ms-2" type="submit" name="purposes_test_all" value="1">{{ _('Test all purposes') }}</button>
+        <small class="text-muted d-block mt-2">{{ _('Tests the models as they are in the fields, without saving: one short call for each model and key.') }}</small>
       </form>
+      {% endif %}
     </div>
   </details>
-  {% endif %}
 
 
   {% if resettable and not confirm_reset %}
@@ -328,8 +376,13 @@
   <form id="ai-key-add" method="post" action="{{ h.url_for('ai_connector.settings_page') }}">
     {{ h.csrf_input() }}<input type="hidden" name="step" value="add_custom_key">
   </form>
-  {% if purpose_errors %}
-    <script>(function () { var box = document.getElementById('purposes'); if (box && box.scrollIntoView) box.scrollIntoView({ block: 'start' }); })();</script>
+  {% if purpose_errors or purpose_tests is not none or focus_row %}
+    {#- Back to where the button was: the row for its own Test (also with an error), else the top of the section. -#}
+    <script>(function () { var box = document.getElementById({{ ('purpose-row.' ~ focus_row if focus_row else 'purposes') | tojson }}); if (box && box.scrollIntoView) box.scrollIntoView({ block: {{ ('center' if focus_row else 'start') | tojson }} }); })();</script>
+  {% endif %}
+  {% if purposes_saved %}
+    {#- The confirmation is for this one visit: a reload or a bookmark should not say it again. -#}
+    <script>(function () { if (window.history && history.replaceState) history.replaceState(null, '', location.pathname + location.hash); })();</script>
   {% endif %}
   {% if errors.custom_name or errors.custom_key or errors.custom_confirm or errors.remove_key %}
     <script>{# after an error in the key forms the page opens at the top: go to the form again #}

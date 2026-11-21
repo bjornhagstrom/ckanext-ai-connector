@@ -132,7 +132,8 @@ if pytest is not None:
         def describe(consumer=None, purpose=None):
             model = model_for(purpose)
             return {"model": model, "service": service_of(model), "capabilities": sorted(capabilities_of(model)),
-                    "timeout_seconds": 30.0, "page_read_timeout_seconds": 180.0}
+                    "timeout_seconds": 30.0, "page_read_timeout_seconds": 180.0,
+                    "source": "purpose" if purpose in state.models else "main"}
 
         monkeypatch.setattr(api, "unavailable_reason", unavailable_reason)
         monkeypatch.setattr(api, "is_ready",

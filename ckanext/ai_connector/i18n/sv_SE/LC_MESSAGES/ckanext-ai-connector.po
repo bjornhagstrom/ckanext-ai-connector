@@ -7,9 +7,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: ckanext-ai-connector 0.2.1\n"
+"Project-Id-Version: ckanext-ai-connector 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-20 13:05+0100\n"
+"POT-Creation-Date: 2026-11-21 21:32+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: sv_SE\n"
@@ -33,15 +33,17 @@ msgstr ""
 "AI-tjänsten godtog inte nyckeln. Kontrollera att nyckeln är rätt och att "
 "den gäller modellens tjänst."
 
-#: ckanext/ai_connector/actions.py:45
+#: ckanext/ai_connector/actions.py:46
 msgid ""
-"The AI service does not know the model, or the key does not give access "
-"to it. Check the model's name."
+"The AI service does not know the model, no longer offers it (old models "
+"are retired, sometimes first for new accounts), or the key does not give "
+"access to it. Check the name, or choose a newer model."
 msgstr ""
-"AI-tjänsten känner inte till modellen, eller så ger nyckeln inte tillgång"
-" till den. Kontrollera modellens namn."
+"AI-tjänsten känner inte till modellen, erbjuder den inte längre (äldre "
+"modeller pensioneras, ibland först för nya konton), eller så ger nyckeln "
+"inte tillgång till den. Kontrollera namnet, eller välj en nyare modell."
 
-#: ckanext/ai_connector/actions.py:47
+#: ckanext/ai_connector/actions.py:49
 msgid ""
 "The AI service did not answer within the time limit. Choose a faster "
 "model (for example one called \"lite\" or \"mini\"), or raise the time "
@@ -51,7 +53,7 @@ msgstr ""
 "exempel en som heter \"lite\" eller \"mini\"), eller höj tidsgränsen för "
 "ett vanligt anrop."
 
-#: ckanext/ai_connector/actions.py:50
+#: ckanext/ai_connector/actions.py:52
 msgid ""
 "The AI service is overloaded or down for the moment; it is not the "
 "settings. Try again in a while."
@@ -59,7 +61,7 @@ msgstr ""
 "AI-tjänsten är överbelastad eller tillfälligt nere; det beror inte på "
 "inställningarna. Försök igen om en stund."
 
-#: ckanext/ai_connector/actions.py:52
+#: ckanext/ai_connector/actions.py:54
 msgid ""
 "The AI service refused more calls for now (too many calls, or the "
 "account's quota is used up). Try again later, or check the account at the"
@@ -68,6 +70,18 @@ msgstr ""
 "AI-tjänsten tar inte emot fler anrop just nu (för många anrop, eller så "
 "är kontots kvot slut). Försök igen senare, eller kontrollera kontot hos "
 "tjänsten."
+
+#: ckanext/ai_connector/actions.py:100
+#, python-brace-format
+msgid ""
+"Give the choices as {\"consumer.purpose\": {\"model\": ..., "
+"\"api_key_env\": ...}}."
+msgstr "Ange valen som {\"consumer.purpose\": {\"model\": ..., \"api_key_env\": ...}}."
+
+#: ckanext/ai_connector/actions.py:115 ckanext/ai_connector/views.py:140
+#: ckanext/ai_connector/views.py:176
+msgid "Choose the API key for this model."
+msgstr "Välj API-nyckeln för den här modellen."
 
 #: ckanext/ai_connector/api.py:50
 #, python-brace-format
@@ -78,7 +92,7 @@ msgstr ""
 "Det här kräver version {required} av AI-anslutningens API (ckanext-ai-"
 "connector); version {installed} är installerad."
 
-#: ckanext/ai_connector/api.py:74 ckanext/ai_connector/api.py:149
+#: ckanext/ai_connector/api.py:74 ckanext/ai_connector/api.py:153
 msgid ""
 "The AI connection (the ai_connector plugin) is not switched on. Add "
 "ai_connector to ckan.plugins."
@@ -87,7 +101,7 @@ msgstr ""
 "ai_connector i ckan.plugins."
 
 #: ckanext/ai_connector/api.py:93 ckanext/ai_connector/checks.py:99
-#: ckanext/ai_connector/client.py:160 ckanext/ai_connector/connection.py:171
+#: ckanext/ai_connector/client.py:160 ckanext/ai_connector/connection.py:177
 msgid "The AI model is missing from the configuration."
 msgstr "AI-modell saknas i konfigurationen."
 
@@ -117,8 +131,9 @@ msgid "Software that the AI connection needs is not installed: {names}."
 msgstr "Programvara som AI-anslutningen behöver är inte installerad: {names}."
 
 #: ckanext/ai_connector/checks.py:42 ckanext/ai_connector/checks.py:47
-msgid "AI model"
-msgstr "AI-modell"
+#: ckanext/ai_connector/templates/ai_connector/settings.html:4
+msgid "Main model"
+msgstr "Huvudmodell"
 
 #: ckanext/ai_connector/checks.py:42
 msgid "No AI model is set, so nothing that needs the AI works."
@@ -152,7 +167,7 @@ msgstr "Välj en nyckel på sidan AI-inställningar."
 msgid "Choose a model and a key of the same service on the AI settings page."
 msgstr "Välj en modell och en nyckel från samma tjänst på sidan AI-inställningar."
 
-#: ckanext/ai_connector/checks.py:61 ckanext/ai_connector/connection.py:154
+#: ckanext/ai_connector/checks.py:61 ckanext/ai_connector/connection.py:160
 msgid "A stored key cannot be read (the portal's secret has changed)."
 msgstr "En sparad nyckel kan inte läsas (portalens hemlighet har ändrats)."
 
@@ -273,7 +288,7 @@ msgstr "AI-timeout måste vara ett antal sekunder."
 msgid "The AI timeout must be greater than zero."
 msgstr "AI-timeout måste vara större än noll."
 
-#: ckanext/ai_connector/connection.py:121
+#: ckanext/ai_connector/connection.py:127
 #, python-brace-format
 msgid ""
 "The key {name} chosen for {purpose} is not one of the allowed keys. "
@@ -282,11 +297,11 @@ msgstr ""
 "Nyckeln {name} som valts för {purpose} är inte en av de tillåtna "
 "nycklarna. Välj en annan på sidan AI-inställningar."
 
-#: ckanext/ai_connector/connection.py:149
+#: ckanext/ai_connector/connection.py:155
 msgid "The name of the environment variable for the AI key is missing."
 msgstr "Namnet på miljövariabeln för AI-nyckeln saknas."
 
-#: ckanext/ai_connector/connection.py:157
+#: ckanext/ai_connector/connection.py:163
 #, python-brace-format
 msgid ""
 "The key {name} added on the settings page is missing or cannot be read. "
@@ -295,7 +310,7 @@ msgstr ""
 "Nyckeln {name} som lades till på inställningssidan saknas eller går inte "
 "att läsa. Skriv in den igen."
 
-#: ckanext/ai_connector/connection.py:165
+#: ckanext/ai_connector/connection.py:171
 #, python-brace-format
 msgid "The environment variable '{name}' is missing or empty."
 msgstr "Miljövariabeln '{name}' saknas eller är tom."
@@ -374,7 +389,7 @@ msgstr ""
 "variabeln. Välj den nyckeln i stället, eller kontrollera vad du klistrade"
 " in."
 
-#: ckanext/ai_connector/purposes.py:41
+#: ckanext/ai_connector/purposes.py:42
 msgid ""
 "A consumer with purposes is named with lower-case letters, digits and _ "
 "(2-64 characters)."
@@ -382,20 +397,20 @@ msgstr ""
 "Ett tillägg med syften namnges med små bokstäver, siffror och _ (2–64 "
 "tecken)."
 
-#: ckanext/ai_connector/purposes.py:43
+#: ckanext/ai_connector/purposes.py:44
 msgid ""
 "A purpose is named with lower-case letters, digits and _ (1-40 "
 "characters)."
 msgstr "Ett syfte namnges med små bokstäver, siffror och _ (1–40 tecken)."
 
-#: ckanext/ai_connector/purposes.py:75
+#: ckanext/ai_connector/purposes.py:97
 #, python-brace-format
 msgid ""
 "A consumer's name and a purpose together may be at most {count} "
 "characters."
 msgstr "Ett tilläggs namn och ett syfte får tillsammans vara högst {count} tecken."
 
-#: ckanext/ai_connector/purposes.py:141
+#: ckanext/ai_connector/purposes.py:163
 #, python-brace-format
 msgid ""
 "The model chosen for {purpose} cannot be read. Choose it again on the AI "
@@ -412,29 +427,29 @@ msgstr "Skriv modellen som tjänst/namn, utan mellanslag."
 msgid "Give a number of seconds between 1 and 600."
 msgstr "Ange ett antal sekunder mellan 1 och 600."
 
-#: ckanext/ai_connector/views.py:73
+#: ckanext/ai_connector/views.py:79
 msgid "Not authorized."
 msgstr "Saknar behörighet."
 
-#: ckanext/ai_connector/views.py:91
+#: ckanext/ai_connector/views.py:99
 msgid "The key and its name are removed."
 msgstr "Nyckeln och dess namn är borttagna."
 
-#: ckanext/ai_connector/views.py:95
+#: ckanext/ai_connector/views.py:103
 msgid "The key entered here is removed."
 msgstr "Nyckeln som angetts här är borttagen."
 
-#: ckanext/ai_connector/views.py:99
+#: ckanext/ai_connector/views.py:107
 msgid "Tick the box to confirm."
 msgstr "Kryssa i rutan för att bekräfta."
 
-#: ckanext/ai_connector/views.py:108
+#: ckanext/ai_connector/views.py:116
 msgid ""
 "A name of your own is only for “Other service…”. Choose that, or empty "
 "the name."
 msgstr "Ett eget namn är bara för ”Annan tjänst…”. Välj den, eller töm namnet."
 
-#: ckanext/ai_connector/views.py:115
+#: ckanext/ai_connector/views.py:123
 msgid ""
 "The key is added. To use it, choose it under “API key” and write the "
 "model, then test the connection and save."
@@ -442,7 +457,7 @@ msgstr ""
 "Nyckeln är tillagd. Välj den under ”API-nyckel” och skriv modellen för "
 "att använda den, testa sedan anslutningen och spara."
 
-#: ckanext/ai_connector/views.py:117
+#: ckanext/ai_connector/views.py:125
 msgid ""
 "The key is saved. To use it, choose a model of its service above, then "
 "test the connection and save."
@@ -450,25 +465,11 @@ msgstr ""
 "Nyckeln är sparad. Välj en modell från dess tjänst ovan för att använda "
 "den, testa sedan anslutningen och spara."
 
-#: ckanext/ai_connector/views.py:132 ckanext/ai_connector/views.py:167
-msgid "Choose the API key for this model."
-msgstr "Välj API-nyckeln för den här modellen."
-
-#: ckanext/ai_connector/views.py:158
-msgid "The models for the purposes are saved and apply now."
-msgstr "Modellerna för syftena är sparade och gäller nu."
-
-#: ckanext/ai_connector/views.py:175
-msgid "Write or choose a model to test, or leave it empty to use the main model."
-msgstr ""
-"Skriv eller välj en modell att testa, eller lämna fältet tomt för att "
-"använda huvudmodellen."
-
-#: ckanext/ai_connector/views.py:183
+#: ckanext/ai_connector/views.py:213
 msgid "The AI settings from the server's configuration apply again."
 msgstr "AI-inställningarna från serverns konfiguration gäller igen."
 
-#: ckanext/ai_connector/views.py:211
+#: ckanext/ai_connector/views.py:241
 msgid "The AI settings are saved and apply now."
 msgstr "AI-inställningarna är sparade och gäller nu."
 
@@ -476,10 +477,6 @@ msgstr "AI-inställningarna är sparade och gäller nu."
 #: ckanext/ai_connector/templates/ai_connector/settings.html:26
 msgid "AI settings"
 msgstr "AI-inställningar"
-
-#: ckanext/ai_connector/templates/ai_connector/settings.html:4
-msgid "Model"
-msgstr "Modell"
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:6
 msgid "Time limit for an ordinary call, seconds"
@@ -570,7 +567,7 @@ msgstr ""
 "kvar."
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:65
-#: ckanext/ai_connector/templates/ai_connector/settings.html:317
+#: ckanext/ai_connector/templates/ai_connector/settings.html:367
 msgid "Use the server's values"
 msgstr "Använd serverns värden"
 
@@ -584,10 +581,12 @@ msgid "The AI answered in %(seconds)s s with the model %(model)s."
 msgstr "AI:n svarade på %(seconds)s s med modellen %(model)s."
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:77
+#: ckanext/ai_connector/templates/ai_connector/settings.html:317
 msgid "Test answer:"
 msgstr "Testsvar:"
 
 #: ckanext/ai_connector/templates/ai_connector/settings.html:82
+#: ckanext/ai_connector/templates/ai_connector/settings.html:319
 msgid "The connection test failed:"
 msgstr "Testet av anslutningen misslyckades:"
 
@@ -784,11 +783,11 @@ msgstr "Testa anslutningen"
 msgid "Save"
 msgstr "Spara"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:259
+#: ckanext/ai_connector/templates/ai_connector/settings.html:260
 msgid "Models for different purposes"
 msgstr "Modeller för olika syften"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:261
+#: ckanext/ai_connector/templates/ai_connector/settings.html:262
 msgid ""
 "An extension can use the AI for several things. Each can have a model of "
 "its own, for example a fast, inexpensive one for translation and a "
@@ -802,17 +801,63 @@ msgstr ""
 "Nyckeln är den för modellens tjänst om du inte väljer en annan; den "
 "skickas aldrig till en annan tjänst."
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:262
+#: ckanext/ai_connector/templates/ai_connector/settings.html:263
 #, python-brace-format
 msgid "The main model is now {model}."
 msgstr "Huvudmodellen är nu {model}."
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:269
-#: ckanext/ai_connector/templates/ai_connector/settings.html:306
+#: ckanext/ai_connector/templates/ai_connector/settings.html:264
+msgid ""
+"An extension that offers this lists its purposes here. An extension that "
+"does not uses the main model, and is not listed."
+msgstr ""
+"Ett tillägg som erbjuder det här listar sina syften här. Ett tillägg som "
+"inte gör det använder huvudmodellen och syns inte här."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:265
+msgid "The models for the purposes are saved and apply now."
+msgstr "Modellerna för syftena är sparade och gäller nu."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:266
+msgid "No installed extension offers purposes of its own yet."
+msgstr "Inget installerat tillägg erbjuder egna syften än."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:267
+msgid ""
+"Set up the main model above first; then a model can be chosen for each "
+"purpose."
+msgstr "Ställ in huvudmodellen ovan först; sedan kan en modell väljas för varje syfte."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:272
+msgid "No installed extension names a purpose, so there was nothing to test."
+msgstr "Inget installerat tillägg anger något syfte, så det fanns inget att testa."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:274
+#, python-brace-format
+msgid "{failed} of {count} purposes did not answer. See the rows below."
+msgstr "{failed} av {count} syften svarade inte. Se raderna nedan."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:276
+#, python-brace-format
+msgid "All {count} purposes answered. Nothing was saved."
+msgstr "Alla {count} syften svarade. Inget sparades."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:287
+#: ckanext/ai_connector/templates/ai_connector/settings.html:354
 msgid "Save the models for the purposes"
 msgstr "Spara modellerna för syftena"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:280
+#: ckanext/ai_connector/templates/ai_connector/settings.html:292
+#, python-brace-format
+msgid "Models of their own: {own} of {count}"
+msgstr "Egen modell: {own} av {count}"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:294
+#, python-brace-format
+msgid "Test the purposes of {extension}"
+msgstr "Testa syftena för {extension}"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:303
 msgid ""
 "No installed extension uses this purpose now. Empty the model to remove "
 "the choice."
@@ -820,34 +865,99 @@ msgstr ""
 "Inget installerat tillägg använder det här syftet nu. Töm modellen för "
 "att ta bort valet."
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:285
+#: ckanext/ai_connector/templates/ai_connector/settings.html:304
+msgid "A model of its own"
+msgstr "Egen modell"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:305
+msgid "Uses the main model"
+msgstr "Använder huvudmodellen"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:307
+msgid "Changed, not saved"
+msgstr "Ändrad, inte sparad"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:310
+#: ckanext/ai_connector/templates/ai_connector/settings.html:317
+#, python-format
+msgid "Answered in %(seconds)s s with %(model)s."
+msgstr "Svarade på %(seconds)s s med %(model)s."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:327
 msgid "The main model"
 msgstr "Huvudmodellen"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:286
+#: ckanext/ai_connector/templates/ai_connector/settings.html:330
+msgid "Empty the field: the main model, and every model in the list"
+msgstr "Töm fältet: huvudmodellen, och alla modeller i listan"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:331
+#, python-brace-format
+msgid "Empty the model for {purpose}"
+msgstr "Töm modellen för {purpose}"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:333
 msgid "The saved choice cannot be read. Choose the model again."
 msgstr "Det sparade valet går inte att läsa. Välj modellen igen."
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:289
+#: ckanext/ai_connector/templates/ai_connector/settings.html:336
 #, python-brace-format
 msgid "API key for {purpose}"
 msgstr "API-nyckel för {purpose}"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:290
+#: ckanext/ai_connector/templates/ai_connector/settings.html:337
 msgid "The key of the model's service"
 msgstr "Nyckeln för modellens tjänst"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:298
+#: ckanext/ai_connector/templates/ai_connector/settings.html:346
 #, python-brace-format
 msgid "Test the model for {purpose}"
 msgstr "Testa modellen för {purpose}"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:298
+#: ckanext/ai_connector/templates/ai_connector/settings.html:346
 msgid "Test"
 msgstr "Testa"
 
-#: ckanext/ai_connector/templates/ai_connector/settings.html:319
+#: ckanext/ai_connector/templates/ai_connector/settings.html:355
+msgid "Test all purposes"
+msgstr "Testa alla syften"
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:356
+msgid ""
+"Tests the models as they are in the fields, without saving: one short "
+"call for each model and key."
+msgstr ""
+"Testar modellerna som de står i fälten, utan att spara: ett kort anrop "
+"per modell och nyckel."
+
+#: ckanext/ai_connector/templates/ai_connector/settings.html:369
 #, python-brace-format
 msgid "For: {fields}"
 msgstr "Gäller: {fields}"
+
+#~ msgid "Model"
+#~ msgstr "Modell"
+
+#~ msgid ""
+#~ "Tests the saved models: one short "
+#~ "call for each model and key, and"
+#~ " nothing is saved. Save first if "
+#~ "you changed a row."
+#~ msgstr ""
+#~ "Testar de sparade modellerna: ett kort"
+#~ " anrop per modell och nyckel, och "
+#~ "inget sparas. Spara först om du "
+#~ "har ändrat en rad."
+
+#~ msgid "AI model"
+#~ msgstr "AI-modell"
+
+#~ msgid ""
+#~ "Write or choose a model to test,"
+#~ " or leave it empty to use the"
+#~ " main model."
+#~ msgstr ""
+#~ "Skriv eller välj en modell att "
+#~ "testa, eller lämna fältet tomt för "
+#~ "att använda huvudmodellen."
 

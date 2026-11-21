@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from ckanext.ai_connector.client import PAGE_READ, AIClient, AIConfigurationError, AIError, AIResponseError, AIResult
 
-API_VERSION = 2
+API_VERSION = 3
 
 __all__ = ["API_VERSION", "PAGE_READ", "AIClient", "AIConfigurationError", "AIError", "AIResponseError", "AIResult",
            "client", "declare_purposes", "describe", "is_ready", "unavailable_reason"]
@@ -110,8 +110,10 @@ def is_ready(min_api: int = 1, consumer: str | None = None, purpose: str | None 
 
 def describe(consumer: str | None = None, purpose: str | None = None) -> dict:
     """The connection in use (for that purpose, API 2), for showing or deciding: ``model``, ``service`` (the part of the
-    model before the slash), ``capabilities`` (a list, maybe holding ``page_read``), ``timeout_seconds`` and
-    ``page_read_timeout_seconds``. Never the key or the service's address."""
+    model before the slash), ``capabilities`` (a list, maybe holding ``page_read``), ``timeout_seconds``,
+    ``page_read_timeout_seconds`` and (API 3) ``source``: ``"purpose"`` when a model is chosen for the purpose, ``"main"``
+    when the main connection applies. Never the key or the service's address."""
+    from ckanext.ai_connector import purposes
     from ckanext.ai_connector.client import capabilities_of, service_of
     from ckanext.ai_connector.connection import ConnectionSettings
 
@@ -122,17 +124,19 @@ def describe(consumer: str | None = None, purpose: str | None = None) -> dict:
     model = current.model if current else ""
     return {"model": model, "service": service_of(model), "capabilities": sorted(capabilities_of(model)),
             "timeout_seconds": current.timeout_seconds if current else None,
-            "page_read_timeout_seconds": current.page_read_timeout_seconds if current else None}
+            "page_read_timeout_seconds": current.page_read_timeout_seconds if current else None,
+            "source": purposes.source(consumer, purpose)}
 
 
-def declare_purposes(consumer: str, purposes: dict) -> None:
+def declare_purposes(consumer: str, purposes: dict, *, name=None) -> None:
     """API 2. Name what ``consumer`` uses the AI for, so that the AI settings page can offer a model per purpose:
     ``{"translate": _("Translation"), ...}``, or a function per purpose that returns the label in the page's language.
     Purpose names are lower case (letters, digits, ``_``). Call it when the plugin loads (for example in ``update_config``).
-    Without a model chosen for it, a purpose uses the main connection."""
+    Without a model chosen for it, a purpose uses the main connection. ``name`` (API 3): the extension's name as the page
+    shows it over its purposes (a text, or a function returning it in the page's language); without it, ``consumer``."""
     from ckanext.ai_connector import purposes as _purposes
 
-    _purposes.declare(consumer, purposes)
+    _purposes.declare(consumer, purposes, name=name)
 
 
 def client(consumer: str, *, purpose: str | None = None, timeout_seconds: float | None = None,

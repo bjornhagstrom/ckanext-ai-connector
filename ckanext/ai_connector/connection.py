@@ -95,10 +95,12 @@ class ConnectionSettings:
             return cls.from_values(_settings.current()).with_stored_key()
 
     @classmethod
-    def for_purpose(cls, consumer, purpose=None):
+    def for_purpose(cls, consumer, purpose=None, choice=None):
         """The connection for one of a consumer's purposes: the model and key chosen for it on the settings page, with the
         main connection's time limits and AI server; the main connection when nothing is chosen. A choice that cannot be
-        read is refused (AIConfigurationError), not replaced by the main connection."""
+        read is refused (AIConfigurationError), not replaced by the main connection. ``choice`` (``{"model",
+        "api_key_env"}``, as typed on the page and not saved) is used instead of the saved one; an empty model there is the
+        main connection."""
         from ckanext.ai_connector import purposes
 
         with _settings.reading():
@@ -106,7 +108,11 @@ class ConnectionSettings:
             if not purpose:
                 return main
             try:
-                chosen = purposes.choice(consumer, purpose)
+                if choice is None:
+                    chosen = purposes.choice(consumer, purpose)
+                else:
+                    purposes.check_names(consumer, purpose)
+                    chosen = dict(choice) if choice.get("model") else None
             except purposes.PurposeError as error:
                 raise AIConfigurationError(str(error)) from None
             if chosen is None:
